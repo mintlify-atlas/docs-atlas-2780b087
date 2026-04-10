@@ -1,0 +1,60 @@
+---
+title: "NvChad: blazing fast Neovim framework with beautiful UI"
+description: "NvChad is a Neovim configuration framework written in Lua that delivers a beautiful UI, smart defaults, and blazing fast startup times out of the box."
+---
+
+NvChad is a Neovim framework that transforms your editor into a powerful, IDE-like environment without sacrificing speed. Built entirely in Lua, it combines a carefully curated set of plugins with custom UI components and intelligent defaults — giving you a stunning, productive Neovim setup in minutes.
+
+<CardGroup cols={2}>
+  <Card title="Install NvChad" icon="rocket" href="/quickstart/install">
+    Get NvChad running on your system with the starter config in just a few steps.
+  </Card>
+  <Card title="Post-Install Setup" icon="sliders" href="/quickstart/post-install">
+    Configure LSP servers, install language parsers, and personalize your setup.
+  </Card>
+  <Card title="Configuration Guide" icon="gear" href="/config/options">
+    Learn how to customize options, keymaps, and plugins to match your workflow.
+  </Card>
+  <Card title="Themes & UI" icon="palette" href="/features/themes">
+    Explore 56+ built-in themes and switch them live with the theme picker.
+  </Card>
+</CardGroup>
+
+## Why NvChad?
+
+NvChad was built for developers who want a beautiful, fast Neovim experience without spending days configuring it from scratch. It's designed to be fast first — plugins are lazy-loaded by default, keeping startup times around 0.02–0.07 seconds even on low-end hardware.
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how NvChad's starter config, core repo, and plugin layers fit together.
+  </Card>
+  <Card title="Lazy Loading" icon="bolt" href="/concepts/lazy-loading">
+    Learn how NvChad achieves blazing fast startups through intelligent lazy loading.
+  </Card>
+  <Card title="Base46 Theming" icon="swatchbook" href="/concepts/base46-theming">
+    Explore the base46 highlight caching system powering NvChad's themes.
+  </Card>
+  <Card title="Custom Plugins" icon="puzzle-piece" href="/guides/custom-plugins">
+    Add your own plugins and extend NvChad with your personal configurations.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+- **56+ color themes** with a live theme switcher — no restart required
+- **Custom UI components**: statusline, tabufline (buffer manager), and NvCheatsheet
+- **LSP out of the box** via `mason.nvim` and `nvim-lspconfig` for code intelligence
+- **Telescope** for fuzzy finding files, buffers, live grep, and more
+- **Treesitter** for accurate, fast syntax highlighting across dozens of languages
+- **nvim-cmp** autocompletion with snippet support via LuaSnip
+- **Git integration** through gitsigns.nvim
+- **File tree** via nvim-tree.lua
+- **Lazy loading** on 93% of plugins for near-instant startup
+
+## Community
+
+NvChad has over 28,000 GitHub stars and an active community across Discord, Matrix, and Telegram. Whether you're just getting started with Neovim or looking to fine-tune an existing setup, NvChad provides the foundation.
+
+<Note>
+NvChad requires **Neovim 0.11 or later**. Make sure your Neovim version is up to date before installing.
+</Note>

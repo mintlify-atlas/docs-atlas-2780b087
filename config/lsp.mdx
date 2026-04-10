@@ -1,0 +1,277 @@
+---
+title: "NvChad LSP setup: on_attach, capabilities, and defaults"
+description: "NvChad pre-configures LSP with nvim-lspconfig and mason.nvim. Learn the public API surface, default keymaps, and how to add language servers."
+---
+
+NvChad wires up the Language Server Protocol through two plugins: `neovim/nvim-lspconfig` (server configuration) and `mason-org/mason.nvim` (server installation). The LSP module at `lua/nvchad/configs/lspconfig.lua` exports three values you can import in your own config and provides a `defaults()` function that sets up diagnostics, highlights, and a globally-shared `lua_ls` configuration.
+
+## Full source
+
+```lua
+local M = {}
+local map = vim.keymap.set
+
+-- export on_attach & capabilities
+M.on_attach = function(_, bufnr)
+  local function opts(desc)
+    return { buffer = bufnr, desc = "LSP " .. desc }
+  end
+
+  map("n", "gD", vim.lsp.buf.declaration, opts "Go to declaration")
+  map("n", "gd", vim.lsp.buf.definition, opts "Go to definition")
+  map("n", "<leader>wa", vim.lsp.buf.add_workspace_folder, opts "Add workspace folder")
+  map("n", "<leader>wr", vim.lsp.buf.remove_workspace_folder, opts "Remove workspace folder")
+
+  map("n", "<leader>wl", function()
+    print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+  end, opts "List workspace folders")
+
+  map("n", "<leader>D", vim.lsp.buf.type_definition, opts "Go to type definition")
+  map("n", "<leader>ra", require "nvchad.lsp.renamer", opts "NvRenamer")
+end
+
+-- disable semanticTokens
+M.on_init = function(client, _)
+  if vim.fn.has "nvim-0.11" ~= 1 then
+    if client.supports_method "textDocument/semanticTokens" then
+      client.server_capabilities.semanticTokensProvider = nil
+    end
+  else
+    if client:supports_method "textDocument/semanticTokens" then
+      client.server_capabilities.semanticTokensProvider = nil
+    end
+  end
+end
+
+M.capabilities = vim.lsp.protocol.make_client_capabilities()
+
+M.capabilities.textDocument.completion.completionItem = {
+  documentationFormat = { "markdown", "plaintext" },
+  snippetSupport = true,
+  preselectSupport = true,
+  insertReplaceSupport = true,
+  labelDetailsSupport = true,
+  deprecatedSupport = true,
+  commitCharactersSupport = true,
+  tagSupport = { valueSet = { 1 } },
+  resolveSupport = {
+    properties = {
+      "documentation",
+      "detail",
+      "additionalTextEdits",
+    },
+  },
+}
+
+M.defaults = function()
+  dofile(vim.g.base46_cache .. "lsp")
+  require("nvchad.lsp").diagnostic_config()
+
+  vim.api.nvim_create_autocmd("LspAttach", {
+    callback = function(args)
+      M.on_attach(_, args.buf)
+    end,
+  })
+
+  local lua_lsp_settings = {
+    Lua = {
+      runtime = { version = "LuaJIT" },
+      workspace = {
+        library = {
+          vim.fn.expand "$VIMRUNTIME/lua",
+          vim.fn.stdpath "data" .. "/lazy/ui/nvchad_types",
+          vim.fn.stdpath "data" .. "/lazy/lazy.nvim/lua/lazy",
+          "${3rd}/luv/library",
+        },
+      },
+    },
+  }
+
+  -- Use new vim.lsp.config API for Neovim 0.11+
+  vim.lsp.config("*", { capabilities = M.capabilities, on_init = M.on_init })
+  vim.lsp.config("lua_ls", { settings = lua_lsp_settings })
+  vim.lsp.enable "lua_ls"
+end
+
+return M
+```
+
+## Public API
+
+The module exports three values you can import in your own LSP setup files.
+
+### `M.on_attach`
+
+A function called once per buffer when a language server attaches. It registers the buffer-local keymaps below.
+
+| Key          | Action                                      |
+| ------------ | ------------------------------------------- |
+| `gD`         | Go to declaration                           |
+| `gd`         | Go to definition                            |
+| `<leader>wa` | Add a workspace folder                      |
+| `<leader>wr` | Remove a workspace folder                   |
+| `<leader>wl` | Print the current workspace folder list     |
+| `<leader>D`  | Go to type definition                       |
+| `<leader>ra` | Rename symbol with NvChad's NvRenamer UI    |
+
+<Note>
+`<leader>ra` opens NvRenamer, a custom floating rename prompt styled by base46. It is equivalent to `vim.lsp.buf.rename` but uses NvChad's UI rather than the built-in input box.
+</Note>
+
+### `M.on_init`
+
+A function passed to every LSP server's `on_init` callback. It disables semantic token highlighting so that Treesitter remains the sole source of syntax colour, keeping the theme consistent across all languages.
+
+The implementation branches on the Neovim version because the method-check API changed in 0.11:
+
+```lua
+-- Neovim < 0.11
+client.supports_method "textDocument/semanticTokens"
+
+-- Neovim >= 0.11
+client:supports_method "textDocument/semanticTokens"
+```
+
+### `M.capabilities`
+
+A capabilities table built from `vim.lsp.protocol.make_client_capabilities()` with an extended `completionItem` block. The extra fields tell language servers that the client supports:
+
+| Capability                 | Effect                                                    |
+| -------------------------- | --------------------------------------------------------- |
+| `snippetSupport`           | Servers can send snippet completions (e.g., function signatures with placeholders) |
+| `documentationFormat`      | Prefer Markdown hover docs with plaintext fallback        |
+| `preselectSupport`         | Server can pre-select a completion item                   |
+| `deprecatedSupport`        | Deprecated symbols are shown with a strikethrough         |
+| `resolveSupport`           | Additional details (`documentation`, `detail`, `additionalTextEdits`) are fetched lazily |
+
+## What `M.defaults()` does
+
+`defaults()` is called once by `nvim-lspconfig` on the `User FilePost` event. It performs four actions:
+
+1. **Loads LSP highlight groups** — calls `dofile` on the base46 LSP cache file to apply themed colours for diagnostics, hover, and code actions.
+2. **Configures diagnostics** — calls `require("nvchad.lsp").diagnostic_config()` to set sign icons, virtual text format, and underline behaviour.
+3. **Registers a global `LspAttach` autocmd** — so `M.on_attach` (and its keymaps) runs automatically for every buffer where any language server attaches.
+4. **Configures `lua_ls`** — applies workspace library paths so the Lua language server understands the Neovim runtime, lazy.nvim, and NvChad type definitions.
+
+## Neovim 0.11+ `vim.lsp.config` API
+
+Neovim 0.11 introduced `vim.lsp.config` and `vim.lsp.enable` as the new first-class API for configuring and enabling language servers, replacing the older `require("lspconfig").server_name.setup {}` pattern.
+
+NvChad uses this new API in `defaults()`:
+
+```lua
+-- Apply capabilities and on_init to ALL servers with the wildcard key "*"
+vim.lsp.config("*", { capabilities = M.capabilities, on_init = M.on_init })
+
+-- Apply Lua-specific workspace settings to lua_ls
+vim.lsp.config("lua_ls", { settings = lua_lsp_settings })
+
+-- Enable lua_ls (equivalent to calling lspconfig.lua_ls.setup {})
+vim.lsp.enable "lua_ls"
+```
+
+<Note>
+The `vim.lsp.config("*", ...)` wildcard applies the given configuration to every server you enable. This means `M.capabilities` and `M.on_init` are automatically inherited by any server you add — you do not need to pass them explicitly.
+</Note>
+
+## Adding language servers
+
+<Steps>
+  <Step title="Install the server with Mason">
+    Open Mason with `:Mason`, search for the server (for example `pyright`), and press `i` to install it. Alternatively, use `:MasonInstall pyright`.
+  </Step>
+  <Step title="Enable the server in your config">
+    Create or open `~/.config/nvim/lua/configs/lspconfig.lua` and enable the server using the new API:
+
+    ```lua
+    -- Enable pyright for Python
+    vim.lsp.enable "pyright"
+
+    -- Enable ts_ls for TypeScript / JavaScript
+    vim.lsp.enable "ts_ls"
+
+    -- Enable rust-analyzer with custom settings
+    vim.lsp.config("rust_analyzer", {
+      settings = {
+        ["rust-analyzer"] = {
+          checkOnSave = { command = "clippy" },
+        },
+      },
+    })
+    vim.lsp.enable "rust_analyzer"
+    ```
+  </Step>
+  <Step title="Require the file from your init.lua">
+    Make sure your starter config loads the file:
+
+    ```lua
+    -- In ~/.config/nvim/init.lua or a file it requires:
+    require "configs.lspconfig"
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+Because `M.defaults()` already calls `vim.lsp.config("*", { capabilities = M.capabilities, on_init = M.on_init })`, every server you enable automatically gets the enhanced capabilities and the semantic token disable. You only need to call `vim.lsp.enable "server_name"`.
+</Tip>
+
+## Using the exported values directly
+
+If you need to pass `on_attach` or `capabilities` explicitly — for example, when using `nvim-lspconfig` in compatibility mode with older servers — import the module:
+
+```lua
+local lspconfig = require "lspconfig"
+local nvchad_lsp = require "nvchad.configs.lspconfig"
+
+lspconfig.gopls.setup {
+  on_attach = nvchad_lsp.on_attach,
+  on_init   = nvchad_lsp.on_init,
+  capabilities = nvchad_lsp.capabilities,
+  settings = {
+    gopls = {
+      gofumpt = true,
+    },
+  },
+}
+```
+
+## Mason configuration
+
+Mason is configured by `lua/nvchad/configs/mason.lua`:
+
+```lua
+dofile(vim.g.base46_cache .. "mason")
+
+return {
+  PATH = "skip",
+
+  ui = {
+    icons = {
+      package_pending = " ",
+      package_installed = " ",
+      package_uninstalled = " ",
+    },
+  },
+
+  max_concurrent_installers = 10,
+}
+```
+
+`PATH = "skip"` tells Mason not to prepend its binary directory to `PATH` because `options.lua` already does this unconditionally at startup. Setting `max_concurrent_installers = 10` speeds up bulk installs (for example, after a fresh setup).
+
+<AccordionGroup>
+  <Accordion title="Why are semantic tokens disabled?">
+    Semantic tokens let LSP servers override Treesitter's syntax highlighting. In practice this creates visible inconsistencies: different servers apply colour differently, and themes cannot fully control the result. NvChad disables semantic tokens so that Treesitter and base46 remain the sole sources of colour, giving every theme full control over every token.
+  </Accordion>
+  <Accordion title="Why does lua_ls get special workspace configuration?">
+    Without the workspace library paths, `lua_ls` reports false errors on every `vim.*` call because it cannot find the Neovim Lua API definitions. The paths added in `lua_lsp_settings` point to:
+
+    - `$VIMRUNTIME/lua` — Neovim's built-in Lua runtime
+    - `lazy/ui/nvchad_types` — NvChad's custom type definitions
+    - `lazy/lazy.nvim/lua/lazy` — lazy.nvim's module types
+    - `${3rd}/luv/library` — libuv Lua bindings used by plenary
+  </Accordion>
+  <Accordion title="Do I need nvim-lspconfig for the new API?">
+    `nvim-lspconfig` is still the recommended approach for Neovim 0.10 and is included in NvChad's bundle. On Neovim 0.11+, `vim.lsp.config` and `vim.lsp.enable` are part of Neovim itself and do not require `nvim-lspconfig`. NvChad's `defaults()` already uses the native API, but `nvim-lspconfig` remains available for older servers that ship their own `setup()` wrappers.
+  </Accordion>
+</AccordionGroup>

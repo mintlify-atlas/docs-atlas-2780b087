@@ -1,0 +1,216 @@
+---
+title: "Add, override, and disable NvChad's bundled plugins"
+description: "Learn how to add new plugins, override NvChad's built-in plugin configs, and disable default plugins using the starter config's plugin table."
+---
+
+NvChad uses [lazy.nvim](https://github.com/folke/lazy.nvim) as its plugin manager. Because lazy.nvim merges plugin specs from multiple sources, you can add new plugins, adjust built-in plugin options, and disable anything you don't need — all from your starter config, without touching the NvChad core repo.
+
+## Where your plugins live
+
+The starter config keeps user plugins in one place:
+
+```
+~/.config/nvim/
+└── lua/
+    └── plugins/
+        └── init.lua   ← add your plugins here
+```
+
+This file returns a table of lazy.nvim plugin specs. NvChad's built-in plugins are declared in its own `lua/nvchad/plugins/init.lua`, and lazy.nvim merges both tables at startup. That means any spec you write here can reference an already-registered plugin to override its options.
+
+<Note>
+Never edit files inside the NvChad core repo (`~/.local/share/nvim/lazy/NvChad/`). Those changes will be overwritten on the next update. Always make customizations in the starter config at `~/.config/nvim/`.
+</Note>
+
+## Adding a new plugin
+
+Add any lazy.nvim-compatible spec to your `lua/plugins/init.lua` table. Here is an example that installs `markdown-preview.nvim` and loads it only for Markdown files:
+
+```lua lua/plugins/init.lua
+return {
+  {
+    "iamcco/markdown-preview.nvim",
+    ft = { "markdown" },
+    build = function()
+      vim.fn["mkdp#util#install"]()
+    end,
+    cmd = { "MarkdownPreview", "MarkdownPreviewToggle" },
+  },
+}
+```
+
+Restart Neovim (or run `:Lazy sync`) and lazy.nvim will clone and install the plugin automatically.
+
+## Overriding a built-in plugin's options
+
+lazy.nvim merges `opts` tables from duplicate specs for the same plugin. To change NvChad's defaults for a plugin, declare the same plugin key and provide only the fields you want to change.
+
+### Using `opts` for simple overrides
+
+NvChad configures `conform.nvim` to format Lua files with `stylua`:
+
+```lua lua/nvchad/plugins/init.lua (NvChad default — do not edit)
+{
+  "stevearc/conform.nvim",
+  opts = {
+    formatters_by_ft = { lua = { "stylua" } },
+  },
+},
+```
+
+To add formatters for more languages, add a second spec for the same plugin in your starter config:
+
+```lua lua/plugins/init.lua
+return {
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters_by_ft = {
+        python = { "black" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+        go = { "gofmt" },
+      },
+    },
+  },
+}
+```
+
+lazy.nvim deep-merges the two `opts` tables, so the `lua = { "stylua" }` entry from NvChad is preserved alongside your additions.
+
+### Using `config` for full control
+
+If you need complete control over how a plugin initialises — for example to call `setup()` with a hand-crafted table — replace the `opts` key with a `config` function:
+
+```lua lua/plugins/init.lua
+return {
+  {
+    "stevearc/conform.nvim",
+    config = function()
+      require("conform").setup({
+        formatters_by_ft = {
+          lua = { "stylua" },
+          python = { "black", "isort" },
+          rust = { "rustfmt" },
+        },
+        format_on_save = {
+          timeout_ms = 500,
+          lsp_fallback = true,
+        },
+      })
+    end,
+  },
+}
+```
+
+<Warning>
+When you supply a `config` function, lazy.nvim calls it instead of the built-in one. Make sure to include all options you need — the NvChad defaults will no longer be applied automatically.
+</Warning>
+
+## Disabling a built-in plugin
+
+Set `enabled = false` on a spec that matches the plugin's source string to stop NvChad from loading it:
+
+```lua lua/plugins/init.lua
+return {
+  -- disable the indent-blankline plugin entirely
+  { "lukas-reineke/indent-blankline.nvim", enabled = false },
+
+  -- disable the file tree if you prefer a different one
+  { "nvim-tree/nvim-tree.lua", enabled = false },
+}
+```
+
+<Note>
+Use the exact repository string from NvChad's plugin list so lazy.nvim can match the spec. You can find all bundled plugins in `~/.local/share/nvim/lazy/NvChad/lua/nvchad/plugins/init.lua`.
+</Note>
+
+## Lazy loading strategies
+
+NvChad loads 93% of its plugins lazily. Follow the same patterns for your own plugins to keep startup time fast.
+
+<AccordionGroup>
+  <Accordion title="Load on command (`cmd`)">
+    The plugin loads the first time one of the listed commands is invoked. Ideal for tools you open deliberately.
+
+    ```lua lua/plugins/init.lua
+    {
+      "folke/todo-comments.nvim",
+      cmd = { "TodoTelescope", "TodoLocList", "TodoQuickFix" },
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Load on event (`event`)">
+    The plugin loads when a specific Neovim autocommand event fires. `User FilePost` is NvChad's convention for "after a real file is opened".
+
+    ```lua lua/plugins/init.lua
+    {
+      "lewis6991/gitsigns.nvim",
+      event = "User FilePost",
+    }
+    ```
+
+    Other useful events: `BufReadPost`, `BufNewFile`, `InsertEnter`.
+  </Accordion>
+
+  <Accordion title="Load on filetype (`ft`)">
+    The plugin loads only when a buffer with a matching filetype is opened. Best for language-specific plugins.
+
+    ```lua lua/plugins/init.lua
+    {
+      "mfussenegger/nvim-dap-python",
+      ft = "python",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Load on keymap (`keys`)">
+    The plugin loads when the specified key sequence is pressed. The plugin is not in memory at all until the key is triggered.
+
+    ```lua lua/plugins/init.lua
+    {
+      "folke/flash.nvim",
+      keys = {
+        { "s", mode = { "n", "x", "o" }, desc = "Flash" },
+        { "S", mode = { "n", "x", "o" }, desc = "Flash treesitter" },
+      },
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Full example: a complete user plugin file
+
+```lua lua/plugins/init.lua
+return {
+  -- extend conform.nvim with extra formatters
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters_by_ft = {
+        python     = { "black" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+      },
+    },
+  },
+
+  -- add a markdown previewer, loaded only for .md files
+  {
+    "iamcco/markdown-preview.nvim",
+    ft = { "markdown" },
+    build = function()
+      vim.fn["mkdp#util#install"]()
+    end,
+    cmd = { "MarkdownPreview", "MarkdownPreviewToggle" },
+  },
+
+  -- disable indent guides if you prefer a cleaner look
+  { "lukas-reineke/indent-blankline.nvim", enabled = false },
+}
+```
+
+<Tip>
+Run `:Lazy` at any time to open the lazy.nvim UI. You can install, update, clean, and profile all plugins from there.
+</Tip>

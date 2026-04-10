@@ -1,0 +1,224 @@
+---
+title: "NvChad post-install: LSP servers, parsers, keymaps"
+description: "Set up LSP language servers, install Treesitter parsers, explore keybindings, and personalize your NvChad configuration after installing."
+---
+
+Once NvChad is installed and Neovim opens to the dashboard, the core framework is running but your language-specific tooling is not yet configured. This page walks you through the essential post-install steps: enabling language servers for code intelligence, installing syntax parsers, learning the key keybindings, and placing your personal customizations where they belong.
+
+## Install LSP language servers with Mason
+
+NvChad bundles [Mason](https://github.com/mason-org/mason.nvim) to manage LSP servers, DAP adapters, linters, and formatters. Mason downloads pre-built binaries and makes them available to Neovim without requiring you to manage them with your system package manager.
+
+### Open the Mason UI
+
+```
+:Mason
+```
+
+The Mason UI shows all available packages. Use `i` to install the package under the cursor, `X` to uninstall, and `u` to update. Press `?` inside Mason to see the full keymap.
+
+### Install a server directly
+
+You can install a specific server without opening the UI:
+
+```
+:MasonInstall pyright
+:MasonInstall typescript-language-server
+:MasonInstall rust-analyzer
+```
+
+<Tip>
+After installing a server with Mason, you need to enable it in your config. See the [Adding LSP servers guide](/guides/adding-lsp-servers) for how to wire a Mason-installed server into `nvim-lspconfig`.
+</Tip>
+
+Mason installs binaries into Neovim's data directory. NvChad automatically prepends the Mason `bin/` path to `vim.env.PATH`, so installed tools are always available to Neovim regardless of your shell's `$PATH`.
+
+### LSP keybindings
+
+These keybindings are active whenever an LSP server is attached to the current buffer:
+
+| Key | Action |
+|---|---|
+| `gd` | Go to definition |
+| `gD` | Go to declaration |
+| `<leader>D` | Go to type definition |
+| `<leader>ra` | Rename symbol (NvRenamer UI) |
+| `<leader>wa` | Add workspace folder |
+| `<leader>wr` | Remove workspace folder |
+| `<leader>wl` | List workspace folders |
+| `<leader>ds` | Open diagnostics in location list |
+
+## Install Treesitter parsers
+
+NvChad uses [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) for accurate, fast syntax highlighting. The default install includes parsers for `lua`, `luadoc`, `printf`, `vim`, and `vimdoc`. Install additional parsers for any languages you work with.
+
+### Install a parser for a specific language
+
+```
+:TSInstall python
+:TSInstall javascript
+:TSInstall go
+```
+
+### Install all available parsers
+
+```
+:TSInstallAll
+```
+
+<Warning>
+`:TSInstallAll` installs parsers for every language Treesitter supports and requires compiling each one. This takes several minutes and uses significant CPU. Install only the parsers you need unless you want all of them.
+</Warning>
+
+### Check parser status
+
+```
+:TSInstallInfo
+```
+
+This lists all parsers and whether they're installed, outdated, or missing.
+
+## Explore keybindings
+
+### Open the cheatsheet
+
+NvChad includes a built-in cheatsheet that lists all default keybindings in a searchable popup:
+
+```
+<leader>ch
+```
+
+The default `<leader>` key is `Space`. Press `<Space>ch` in normal mode to open NvCheatsheet.
+
+### Switch themes
+
+NvChad ships with 56+ color themes. Open the live theme picker to preview and apply them without restarting:
+
+```
+<leader>th
+```
+
+The theme picker shows a live preview as you move through the list. Press `Enter` to apply a theme persistently.
+
+### Key default keybindings
+
+The tables below cover the most-used default keybindings grouped by category. All mappings are defined in `lua/nvchad/mappings.lua`.
+
+**General**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<C-s>` | Normal | Save file |
+| `<C-c>` | Normal | Copy entire file to clipboard |
+| `<Esc>` | Normal | Clear search highlights |
+| `<leader>n` | Normal | Toggle line numbers |
+| `<leader>rn` | Normal | Toggle relative line numbers |
+| `<leader>ch` | Normal | Open NvCheatsheet |
+| `<leader>fm` | Normal / Visual | Format file or selection |
+
+**Window navigation**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<C-h>` | Normal | Move to left window |
+| `<C-l>` | Normal | Move to right window |
+| `<C-j>` | Normal | Move to window below |
+| `<C-k>` | Normal | Move to window above |
+
+**Insert mode movement**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<C-b>` | Insert | Move to beginning of line |
+| `<C-e>` | Insert | Move to end of line |
+| `<C-h>` | Insert | Move left |
+| `<C-l>` | Insert | Move right |
+| `<C-j>` | Insert | Move down |
+| `<C-k>` | Insert | Move up |
+
+**Buffer management**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<Tab>` | Normal | Go to next buffer |
+| `<S-Tab>` | Normal | Go to previous buffer |
+| `<leader>b` | Normal | Open new buffer |
+| `<leader>x` | Normal | Close current buffer |
+
+**File tree**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<C-n>` | Normal | Toggle file tree |
+| `<leader>e` | Normal | Focus file tree |
+
+**Telescope**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<leader>ff` | Normal | Find files |
+| `<leader>fa` | Normal | Find all files (including hidden) |
+| `<leader>fw` | Normal | Live grep (search in files) |
+| `<leader>fb` | Normal | Find open buffers |
+| `<leader>fh` | Normal | Search help tags |
+| `<leader>fo` | Normal | Find recently opened files |
+| `<leader>fz` | Normal | Fuzzy find in current buffer |
+| `<leader>cm` | Normal | Browse git commits |
+| `<leader>gt` | Normal | Show git status |
+| `<leader>th` | Normal | Open theme picker |
+
+**Terminal**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<leader>h` | Normal | Open new horizontal terminal |
+| `<leader>v` | Normal | Open new vertical terminal |
+| `<A-h>` | Normal / Terminal | Toggle horizontal terminal |
+| `<A-v>` | Normal / Terminal | Toggle vertical terminal |
+| `<A-i>` | Normal / Terminal | Toggle floating terminal |
+| `<C-x>` | Terminal | Exit terminal mode |
+
+**Comments**
+
+| Key | Mode | Action |
+|---|---|---|
+| `<leader>/` | Normal | Toggle comment on line |
+| `<leader>/` | Visual | Toggle comment on selection |
+
+## Add your personal customizations
+
+The starter config is organized so your personal files are separate from the NvChad core. The key files in the starter config are:
+
+```
+~/.config/nvim/
+├── init.lua          # Bootstraps lazy.nvim — do not modify this
+└── lua/
+    ├── chadrc.lua    # NvChad UI and behavior options (theme, tabufline, etc.)
+    ├── options.lua   # Additional Neovim options
+    ├── mappings.lua  # Your custom keybindings
+    └── plugins/      # Your additional plugins
+        └── init.lua
+```
+
+Edit `lua/chadrc.lua` to override NvChad's UI options — for example, which theme to use by default, or whether to enable the tabufline. Edit `lua/plugins/init.lua` to add or override plugins using lazy.nvim's standard spec format.
+
+<Note>
+Changes to `chadrc.lua` and plugin specs take effect after restarting Neovim or running `:Lazy sync`.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration guide" icon="gear" href="/config/options">
+    Deep dive into customizing options, keymaps, and plugins.
+  </Card>
+  <Card title="Adding LSP servers" icon="code" href="/guides/adding-lsp-servers">
+    Wire Mason-installed servers into nvim-lspconfig for full code intelligence.
+  </Card>
+  <Card title="Themes and UI" icon="palette" href="/features/themes">
+    Explore all 56+ themes and configure the statusline and tabufline.
+  </Card>
+  <Card title="Custom plugins" icon="puzzle-piece" href="/guides/custom-plugins">
+    Extend NvChad with your own plugin additions and overrides.
+  </Card>
+</CardGroup>

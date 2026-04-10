@@ -1,0 +1,127 @@
+---
+title: "NvimTree: sidebar file explorer and tree navigation"
+description: "NvChad includes nvim-tree.lua as its file tree. Learn how to open, navigate, and manage files with the built-in keymaps and configuration."
+---
+
+NvChad uses `nvim-tree.lua` as its file explorer. It opens as a sidebar panel on the left, tracks your working directory, highlights git-modified files, and integrates with the base46 theme system so its colors always match the rest of your editor. nvim-tree is loaded lazily — it only starts when you first open it.
+
+## Opening and closing
+
+Two keymaps control the tree from Normal mode:
+
+| Keymap | Command | Description |
+|--------|---------|-------------|
+| `<C-n>` | `:NvimTreeToggle` | Open or close the tree panel |
+| `<leader>e` | `:NvimTreeFocus` | Move the cursor into the tree (opens it if closed) |
+
+You can also call the commands directly:
+
+```
+:NvimTreeToggle   " open if closed, close if open
+:NvimTreeFocus    " focus the tree, opening it if needed
+```
+
+## Default configuration
+
+NvChad's nvim-tree config is at `lua/nvchad/configs/nvimtree.lua`. It applies sensible defaults for most workflows:
+
+```lua
+dofile(vim.g.base46_cache .. "nvimtree")
+
+return {
+  filters = { dotfiles = false },
+  disable_netrw = true,
+  hijack_cursor = true,
+  sync_root_with_cwd = true,
+  update_focused_file = {
+    enable = true,
+    update_root = false,
+  },
+  view = {
+    width = 30,
+    preserve_window_proportions = true,
+  },
+  renderer = {
+    root_folder_label = false,
+    highlight_git = true,
+    indent_markers = { enable = true },
+    icons = {
+      glyphs = {
+        default = "󰈚",
+        folder = {
+          default = "",
+          empty = "",
+          empty_open = "",
+          open = "",
+          symlink = "",
+        },
+        git = { unmerged = "" },
+      },
+    },
+  },
+}
+```
+
+Notable settings:
+
+- **`disable_netrw = true`** — disables Neovim's built-in file browser so nvim-tree handles directory arguments
+- **`hijack_cursor = true`** — keeps the cursor on the filename when navigating
+- **`sync_root_with_cwd = true`** — the tree root updates when you change the working directory
+- **`update_focused_file.enable = true`** — the tree highlights and reveals the file you're editing automatically
+- **`highlight_git = true`** — file names are colored to reflect their git status (modified, untracked, staged, etc.)
+- **`indent_markers.enable = true`** — shows `│` guide lines for nested directories
+
+## Navigating inside the tree
+
+Once the cursor is inside the tree, nvim-tree's built-in keymaps apply. The most commonly used ones:
+
+| Key | Action |
+|-----|--------|
+| `<CR>` or `o` | Open file or expand/collapse directory |
+| `a` | Create a new file or directory (end with `/` for a directory) |
+| `d` | Delete the file or directory under the cursor |
+| `r` | Rename the file or directory |
+| `x` | Cut (mark for move) |
+| `c` | Copy |
+| `p` | Paste |
+| `y` | Copy filename to clipboard |
+| `Y` | Copy relative path to clipboard |
+| `gy` | Copy absolute path to clipboard |
+| `H` | Toggle hidden (dotfile) visibility |
+| `R` | Refresh the tree |
+| `W` | Collapse all open directories |
+| `q` | Close the tree panel |
+| `g?` | Show all available keymaps |
+
+<Tip>
+Press `g?` inside the tree for the full keymap list. The list reflects any customizations you've made, so it's always up to date.
+</Tip>
+
+## Customizing nvim-tree in your personal config
+
+To change nvim-tree's behavior, override its `opts` in your personal plugins file. Always merge with the NvChad base config so you keep the theme integration:
+
+```lua
+-- ~/.config/nvim/lua/plugins/init.lua (your personal config)
+{
+  "nvim-tree/nvim-tree.lua",
+  opts = function()
+    local conf = require "nvchad.configs.nvimtree"
+
+    -- Example: set a wider panel
+    conf.view.width = 40
+
+    -- Example: hide dotfiles by default
+    conf.filters.dotfiles = true
+
+    -- Example: disable the git root change behavior
+    conf.sync_root_with_cwd = false
+
+    return conf
+  end,
+},
+```
+
+<Warning>
+If you replace the entire opts table instead of merging, you'll lose the `dofile(vim.g.base46_cache .. "nvimtree")` call at the top of the base config. This will break the theme integration and cause nvim-tree to render with incorrect highlight colors. Always merge rather than replace.
+</Warning>

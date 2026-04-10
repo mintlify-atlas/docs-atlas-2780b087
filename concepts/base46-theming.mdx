@@ -1,0 +1,182 @@
+---
+title: "Base46: NvChad's theme and highlight caching engine"
+description: "Base46 caches compiled highlight groups to a Lua bytecode file, enabling near-instant theme switching across all NvChad plugins without restart."
+---
+
+Base46 is NvChad's dedicated highlight management plugin (`nvchad/base46`). Rather than applying highlight groups directly at startup, it compiles every theme's color table and plugin-specific overrides into Lua bytecode files stored on disk. Each plugin then loads its own highlight groups on demand by calling `dofile()` with its cache key. This means changing your theme is a cache rebuild and a `dofile` call — no Neovim restart, no re-sourcing your entire config.
+
+## What base46 does
+
+Base46 manages highlight groups for every bundled NvChad plugin. Instead of scattering `vim.api.nvim_set_hl` calls across plugin configs, base46 centralizes all color definitions under a single theme system with 56+ built-in themes. When you switch themes, base46 rewrites the cache files and each plugin reloads its highlights from the new cache.
+
+The cache lives at the path stored in `vim.g.base46_cache`, which is set by base46 at startup. On a typical Linux system this resolves to something like:
+
+```
+~/.local/share/nvim/base46/
+  telescope
+  treesitter
+  syntax
+  blankline
+  whichkey
+  devicons
+  git
+  cmp
+  ...
+```
+
+Each file is a compiled Lua chunk (bytecode) that calls `vim.api.nvim_set_hl` for one plugin's highlight groups when executed.
+
+## The `dofile` pattern
+
+Every plugin that uses base46 highlights calls `dofile(vim.g.base46_cache .. "<key>")` to apply its highlight groups. This call is placed inside the plugin's `opts` function or `config` callback so highlights load at the same time as the plugin itself — not at startup.
+
+Here are real examples from `lua/nvchad/plugins/init.lua`:
+
+```lua
+-- nvim-web-devicons: highlights applied inside opts
+{
+  "nvim-tree/nvim-web-devicons",
+  opts = function()
+    dofile(vim.g.base46_cache .. "devicons")
+    return { override = require "nvchad.icons.devicons" }
+  end,
+},
+
+-- indent-blankline: highlights applied inside config
+{
+  "lukas-reineke/indent-blankline.nvim",
+  event = "User FilePost",
+  config = function(_, opts)
+    dofile(vim.g.base46_cache .. "blankline")
+    require("ibl").setup(opts)
+    dofile(vim.g.base46_cache .. "blankline")  -- re-applied after setup
+  end,
+},
+
+-- which-key: highlights applied inside opts
+{
+  "folke/which-key.nvim",
+  keys = { "<leader>", "<c-w>", '"', "'", "`", "c", "v", "g" },
+  cmd = "WhichKey",
+  opts = function()
+    dofile(vim.g.base46_cache .. "whichkey")
+    return {}
+  end,
+},
+```
+
+And from `lua/nvchad/configs/telescope.lua`:
+
+```lua
+-- lua/nvchad/configs/telescope.lua
+dofile(vim.g.base46_cache .. "telescope")
+
+return {
+  defaults = {
+    prompt_prefix = "   ",
+    selection_caret = " ",
+    -- ...
+  },
+}
+```
+
+For treesitter, both `syntax` and `treesitter` cache files are loaded together:
+
+```lua
+-- lua/nvchad/configs/treesitter.lua
+pcall(function()
+  dofile(vim.g.base46_cache .. "syntax")
+  dofile(vim.g.base46_cache .. "treesitter")
+end)
+```
+
+The `pcall` wrapper is intentional — if the cache doesn't exist yet (for example, on first install before `build` has run), treesitter still loads without throwing an error.
+
+## Building the cache with `load_all_highlights`
+
+The base46 plugin spec includes a `build` hook that regenerates all cache files:
+
+```lua
+{
+  "nvchad/base46",
+  build = function()
+    require("base46").load_all_highlights()
+  end,
+},
+```
+
+`load_all_highlights()` iterates over every registered plugin integration, compiles that plugin's highlight groups using the active theme's color palette, and writes the resulting bytecode to `vim.g.base46_cache`. This build step runs automatically when:
+
+- You install NvChad for the first time (lazy.nvim runs `build` after install)
+- You update the `nvchad/base46` plugin
+- You change your theme via the theme picker (`<leader>th`)
+
+<Note>
+You can manually trigger a cache rebuild at any time with `:lua require("base46").load_all_highlights()`. This is useful if you add a new integration or modify highlight overrides in your `chadrc.lua`.
+</Note>
+
+## 56+ built-in themes
+
+NvChad ships with over 56 built-in themes. The active theme is set via `nvconfig`:
+
+```lua
+-- lua/chadrc.lua
+local M = {}
+M.ui = {
+  theme = "onedark",      -- any of the 56+ theme names
+  theme_toggle = { "onedark", "one_light" },  -- toggle between two themes
+}
+return M
+```
+
+You can browse and switch themes live with the theme picker, bound to `<leader>th` by default. The picker calls `require("nvchad.themes").open()`, which rebuilds the cache for whichever theme you select and reloads all highlight groups without restarting Neovim.
+
+## Highlight overrides for plugins
+
+Your `chadrc.lua` can override any highlight group base46 computes. The `base46` table in `nvconfig` accepts a `custom_highlights` function and an `integrations` list:
+
+```lua
+-- lua/chadrc.lua
+local M = {}
+
+M.base46 = {
+  -- Add integrations beyond the defaults
+  integrations = {
+    "blankline",
+    "cmp",
+    "git",
+    "lsp",
+    "mason",
+    "whichkey",
+  },
+
+  -- Override specific highlight groups
+  custom_highlights = function(colors)
+    return {
+      Comment = { fg = colors.grey },
+      ["@variable"] = { fg = colors.red },
+    }
+  end,
+}
+
+return M
+```
+
+The `colors` argument passed to `custom_highlights` is the full color palette of the active theme, so overrides stay in sync when you switch themes.
+
+<Tip>
+Use the `integrations` list to opt into base46-managed highlights for community plugins. If a base46 integration exists for a plugin you install (for example, `"nvimtree"` or `"mason"`), adding it here means that plugin's highlights update automatically when you switch themes.
+</Tip>
+
+## Why bytecode caching matters
+
+Applying highlight groups at startup with `vim.api.nvim_set_hl` is expensive when you have dozens of plugins. By writing compiled Lua bytecode to disk and reading it back with `dofile`, base46 turns theme application into a fast file read. The bytecode is already compiled — Lua just executes it. This is why theme switching is near-instant and why startup time stays below 0.07 seconds even with a rich highlight setup.
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn how NvChad's two-repo structure keeps the core framework separate from your config.
+  </Card>
+  <Card title="Lazy loading" icon="bolt" href="/concepts/lazy-loading">
+    Understand the event, command, and keymap triggers that keep startup time fast.
+  </Card>
+</CardGroup>

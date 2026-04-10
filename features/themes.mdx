@@ -1,0 +1,134 @@
+---
+title: "NvChad themes: 56+ colorschemes with live theme picker"
+description: "NvChad ships with 56+ color themes powered by base46. Switch themes live with the built-in picker or set your default theme in your config."
+---
+
+NvChad includes over 56 color themes, all managed by the `base46` theming engine. Every theme compiles to a set of cached highlight definitions, which means switching themes is fast and all UI components — statusline, tabufline, Telescope, nvim-tree, and more — update instantly without restarting Neovim.
+
+## The theme picker
+
+Press `<leader>th` from Normal mode to open the live theme picker. As you move through the list, the editor updates in real time so you can see exactly what each theme looks like before committing.
+
+The picker is powered by the `nvchad/ui` plugin's `themes` extension and calls:
+
+```lua
+require("nvchad.themes").open()
+```
+
+You can also bind this yourself or call it from the command line:
+
+```lua
+:lua require("nvchad.themes").open()
+```
+
+## Setting a default theme
+
+Your default theme is set in `chadrc.lua` inside your starter config. Open `~/.config/nvim/lua/chadrc.lua` and set the `base46.theme` field:
+
+```lua
+---@type ChadrcConfig
+local M = {}
+
+M.base46 = {
+  theme = "onedark",  -- replace with any theme name
+}
+
+return M
+```
+
+The theme name must match one of the names in base46's theme list. Theme names are lowercase and use underscores (e.g., `"tokyonight"`, `"gruvbox"`, `"catppuccin"`).
+
+<Steps>
+  <Step title="Open your chadrc">
+    Open `~/.config/nvim/lua/chadrc.lua` in your editor.
+  </Step>
+  <Step title="Set the theme name">
+    Add or update the `base46.theme` key with the name of the theme you want as your default.
+  </Step>
+  <Step title="Restart or recompile">
+    Save the file and restart Neovim, or run `:lua require("base46").load_all_highlights()` to apply the change without restarting.
+  </Step>
+</Steps>
+
+## Available themes
+
+NvChad ships with 56+ themes covering a wide range of styles. A selection of popular ones:
+
+| Theme | Style |
+|-------|-------|
+| `onedark` | Dark, Atom-inspired |
+| `catppuccin` | Pastel dark (Mocha variant) |
+| `tokyonight` | Deep blue-purple dark |
+| `dracula` | Purple-accented dark |
+| `gruvbox` | Warm earthy retro |
+| `nord` | Arctic, blue-grey |
+| `radium` | NvChad-original, vibrant dark |
+| `everforest` | Muted green-tinted dark |
+| `rosepine` | Muted rose and pine |
+| `github_dark` | GitHub's editor dark theme |
+| `nightfox` | Cool-toned dark |
+| `flexoki-dark` | Ink-inspired low contrast |
+| `material-darker` | Material Design dark variant |
+| `solarized_dark` | Classic Solarized |
+
+Open the picker with `<leader>th` to browse the full list with live previews.
+
+## How base46 caching works
+
+When you select a theme, base46 compiles all highlight groups for that theme and writes them to a cache directory at `vim.g.base46_cache`. Each plugin that integrates with base46 loads its highlight file from this cache at startup using `dofile`:
+
+```lua
+dofile(vim.g.base46_cache .. "telescope")   -- loads Telescope highlights
+dofile(vim.g.base46_cache .. "nvimtree")    -- loads nvim-tree highlights
+dofile(vim.g.base46_cache .. "blankline")   -- loads indent-blankline highlights
+```
+
+This means highlight application is nearly instant — no Lua table merging or `vim.api.nvim_set_hl` calls at startup. The cache is rebuilt whenever you switch themes or call `require("base46").load_all_highlights()`.
+
+For a deeper explanation of the caching system, see [Base46 theming](/concepts/base46-theming).
+
+## Color utilities with nvzone/minty
+
+`nvzone/minty` adds two interactive color exploration commands:
+
+**`:Huefy`** — opens an interactive hue wheel. Use it to explore colors and copy hex values into your config or highlight overrides.
+
+**`:Shades`** — given a base color, generates a palette of tints and shades. Useful when you want to derive consistent variations for a custom highlight group.
+
+Both commands are lazy-loaded and only activate when you call them:
+
+```lua
+{ "nvzone/minty", cmd = { "Huefy", "Shades" } }
+```
+
+## Creating a custom theme
+
+To add a theme that isn't in base46's built-in set, define it in `chadrc.lua` under `base46.theme_toggle` or provide a custom theme table. The simplest approach for personalization is overriding highlight groups:
+
+```lua
+---@type ChadrcConfig
+local M = {}
+
+M.base46 = {
+  theme = "onedark",
+
+  hl_override = {
+    -- Override specific highlight groups
+    Comment = { italic = true },
+    ["@variable"] = { fg = "#e5c07b" },
+  },
+
+  hl_add = {
+    -- Define entirely new highlight groups
+    MyCustomHighlight = { fg = "#ff6c6b", bold = true },
+  },
+}
+
+return M
+```
+
+`hl_override` merges your changes on top of the active theme's definitions. `hl_add` lets you define new groups that the theme doesn't include. Both are applied after the base46 cache is loaded, so they always take precedence.
+
+<Note>
+If you want to share a full custom theme with the community, refer to the base46 repository for the theme table format. Custom themes follow the same structure as the built-in ones and can be loaded by pointing `theme` at your custom table.
+</Note>

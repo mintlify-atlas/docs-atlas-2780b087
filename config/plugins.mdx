@@ -1,0 +1,194 @@
+---
+title: "NvChad bundled plugins: full list and how to extend"
+description: "NvChad bundles a curated set of plugins via lazy.nvim. Learn what is included by default and how to add, remove, or override plugins in your config."
+---
+
+NvChad uses [lazy.nvim](https://github.com/folke/lazy.nvim) as its plugin manager. The core plugin list lives in `lua/nvchad/plugins/init.lua` and is merged with your own plugin table at startup. Every plugin is either lazy-loaded by command, event, or key press — so the baseline startup time stays small regardless of how many plugins are installed.
+
+## Bundled plugins
+
+The following plugins are included in every NvChad installation.
+
+### Utility and UI foundation
+
+| Plugin | Description |
+| ------ | ----------- |
+| `nvim-lua/plenary.nvim` | Utility library used by most Lua plugins for async tasks, file I/O, and testing helpers. |
+| `nvchad/base46` | NvChad's theming engine. Compiles highlight groups from theme definitions and writes bytecode to a cache so that colourscheme switching is instant. |
+| `nvchad/ui` | Provides the statusline, tabufline (buffer bar), NvChad-style dashboard, and the floating cheatsheet. Loaded eagerly (`lazy = false`). |
+
+### nvzone plugins
+
+| Plugin | Description |
+| ------ | ----------- |
+| `nvzone/volt` | Minimal reactive UI framework used by other nvzone plugins to render floating windows. |
+| `nvzone/menu` | Context-aware mouse-friendly floating menu, replacing the default right-click menu. |
+| `nvzone/minty` | Colour utilities. The `Huefy` command opens an HSL colour picker; `Shades` generates tint/shade palettes. Loaded on demand. |
+
+### Icons and indent guides
+
+| Plugin | Description |
+| ------ | ----------- |
+| `nvim-tree/nvim-web-devicons` | Nerd Font icon set. Provides file-type icons for NvimTree, Telescope, the tabufline, and other UI surfaces. |
+| `lukas-reineke/indent-blankline.nvim` | Renders vertical indent-guide lines. NvChad configures two distinct highlight groups (`IblChar` and `IblScopeChar`) so the current scope is visually distinguished from surrounding indentation. |
+
+### File management
+
+| Plugin | Description |
+| ------ | ----------- |
+| `nvim-tree/nvim-tree.lua` | File explorer tree. Loaded on demand via the `NvimTreeToggle` and `NvimTreeFocus` commands (bound to `<C-n>` and `<leader>e`). |
+
+### Key discovery
+
+| Plugin | Description |
+| ------ | ----------- |
+| `folke/which-key.nvim` | Shows a popup of available key continuations when you pause after pressing a prefix key. Loaded lazily on the first relevant key press. |
+
+### Formatting
+
+| Plugin | Description |
+| ------ | ----------- |
+| `stevearc/conform.nvim` | Language-agnostic formatter runner. NvChad pre-configures `stylua` for Lua files. Extend `formatters_by_ft` in your own config to add formatters for other languages. |
+
+### Git
+
+| Plugin | Description |
+| ------ | ----------- |
+| `lewis6991/gitsigns.nvim` | Shows added, changed, and removed lines in the sign column. Also provides hunk-level staging, blame, and diff commands. |
+
+### LSP and Mason
+
+| Plugin | Description |
+| ------ | ----------- |
+| `mason-org/mason.nvim` | Portable package manager for LSP servers, DAP adapters, linters, and formatters. Installed binaries are automatically added to `PATH` by `options.lua`. |
+| `neovim/nvim-lspconfig` | Collection of community-maintained LSP server configurations. NvChad calls `require("nvchad.configs.lspconfig").defaults()` on `User FilePost` to set up keymaps, diagnostics, and `lua_ls`. |
+
+### Completion
+
+| Plugin | Description |
+| ------ | ----------- |
+| `hrsh7th/nvim-cmp` | Completion engine. Loaded only in insert mode. Sources: `nvim_lsp`, `luasnip`, `buffer`, `nvim_lua`, and `async_path`. |
+| `L3MON4D3/LuaSnip` | Snippet engine. Loaded as a dependency of nvim-cmp. |
+| `rafamadriz/friendly-snippets` | A large collection of VS Code-style snippets for many languages, loaded by LuaSnip. |
+| `windwp/nvim-autopairs` | Automatically closes brackets, parentheses, and quotes. Integrated with nvim-cmp so a confirmed completion also closes the pair. |
+| `saadparwaiz1/cmp_luasnip` | LuaSnip source for nvim-cmp. |
+| `hrsh7th/cmp-nvim-lsp` | LSP source for nvim-cmp. |
+| `hrsh7th/cmp-nvim-lua` | Neovim Lua API source for nvim-cmp (completes `vim.*` in Lua files). |
+| `hrsh7th/cmp-buffer` | Buffer word source for nvim-cmp. |
+| `FelipeLema/cmp-async-path` | Async filesystem path source for nvim-cmp. |
+
+### Fuzzy finding and syntax
+
+| Plugin | Description |
+| ------ | ----------- |
+| `nvim-telescope/telescope.nvim` | Extensible fuzzy finder for files, buffers, grep, git, and more. Loaded on demand via the `Telescope` command. |
+| `nvim-treesitter/nvim-treesitter` | Incremental parsing and syntax highlighting. NvChad pre-installs parsers for `lua`, `luadoc`, `printf`, `vim`, and `vimdoc`. |
+
+## Adding plugins
+
+Add your own plugins by returning a lazy.nvim spec table from `~/.config/nvim/lua/plugins/init.lua` in your starter config:
+
+```lua
+return {
+  -- A simple plugin with default options
+  "tpope/vim-sleuth",
+
+  -- A plugin with custom configuration
+  {
+    "folke/todo-comments.nvim",
+    event = "User FilePost",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    opts = {
+      signs = true,
+      keywords = {
+        FIX  = { icon = " ", color = "error" },
+        TODO = { icon = " ", color = "info" },
+        HACK = { icon = " ", color = "warning" },
+      },
+    },
+  },
+}
+```
+
+<Steps>
+  <Step title="Open your plugins file">
+    ```bash
+    nvim ~/.config/nvim/lua/plugins/init.lua
+    ```
+  </Step>
+  <Step title="Add a plugin spec">
+    Return a table of lazy.nvim plugin specs. You can mix short-form strings (for plugins that need no configuration) with full spec tables.
+  </Step>
+  <Step title="Sync plugins">
+    Run `:Lazy sync` inside Neovim to install, update, and clean plugins. Alternatively, restart Neovim — lazy.nvim installs missing plugins on startup.
+  </Step>
+</Steps>
+
+## Overriding a bundled plugin's configuration
+
+Because lazy.nvim merges specs by plugin name, you can override any bundled plugin's `opts`, `config`, or other fields by including a spec with the same short name in your own plugins table:
+
+```lua
+return {
+  -- Override conform.nvim to add more formatters
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters_by_ft = {
+        lua        = { "stylua" },
+        python     = { "black" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+      },
+    },
+  },
+
+  -- Override treesitter to install more parsers
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts = {
+      ensure_installed = {
+        "lua", "luadoc", "printf", "vim", "vimdoc",
+        "python", "javascript", "typescript", "html", "css",
+      },
+    },
+  },
+}
+```
+
+<Note>
+lazy.nvim performs a deep merge of `opts` tables. You only need to specify the fields you want to change — the rest of NvChad's defaults remain intact.
+</Note>
+
+## Disabling a bundled plugin
+
+Pass `enabled = false` to disable a plugin without removing it from the spec:
+
+```lua
+return {
+  -- Disable the file tree if you prefer a different explorer
+  {
+    "nvim-tree/nvim-tree.lua",
+    enabled = false,
+  },
+
+  -- Disable indent guides
+  {
+    "lukas-reineke/indent-blankline.nvim",
+    enabled = false,
+  },
+}
+```
+
+<Warning>
+Disabling a plugin that other plugins depend on may cause errors. Check the dependency graph with `:Lazy` before disabling core plugins like `plenary.nvim` or `nvchad/ui`.
+</Warning>
+
+## Viewing installed plugins
+
+Run `:Lazy` to open the lazy.nvim plugin manager UI. From there you can:
+
+- See the load time and status of every plugin
+- Update individual plugins or all at once
+- Profile startup time with the **Profile** tab
+- View the plugin's source, readme, and changelog

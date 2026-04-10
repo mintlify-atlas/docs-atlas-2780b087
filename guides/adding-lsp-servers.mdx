@@ -1,0 +1,228 @@
+---
+title: "Install and configure LSP language servers in NvChad"
+description: "NvChad uses mason.nvim and nvim-lspconfig to manage language servers. Learn how to install servers and configure them for your languages."
+---
+
+NvChad ships with `mason.nvim` for installing language servers and `nvim-lspconfig` for configuring them. The two tools serve different purposes: Mason handles downloading and updating server binaries, while lspconfig connects those servers to Neovim's built-in LSP client. Adding support for a new language is a two-step process: install the server, then configure it.
+
+## How NvChad sets up LSP
+
+When any file is opened (`User FilePost` event), NvChad loads `nvim-lspconfig` and calls `require("nvchad.configs.lspconfig").defaults()`. This does three things:
+
+- Applies the base46 LSP highlight cache
+- Configures diagnostic display (signs, virtual text, float)
+- Registers `on_attach` keymaps for every buffer where an LSP server attaches
+
+NvChad also enables `lua_ls` by default, pre-configured with the correct library paths for editing Neovim configs.
+
+## Step 1: Install a language server with Mason
+
+<Steps>
+  <Step title="Open the Mason UI">
+    Run the `:Mason` command inside Neovim to open the Mason package manager interface.
+
+    ```
+    :Mason
+    ```
+
+    Use `j` / `k` to navigate, `/` to search by name, and `i` to install the package under the cursor.
+  </Step>
+
+  <Step title="Or install directly from the command line">
+    If you already know the server name, you can install without opening the UI:
+
+    ```bash
+    :MasonInstall pyright typescript-language-server
+    ```
+
+    Mason installs binaries into `~/.local/share/nvim/mason/bin/` and adds them to Neovim's `PATH` automatically. The Mason config in NvChad sets `PATH = "skip"`, meaning these binaries are available inside Neovim but not exposed to your shell.
+  </Step>
+
+  <Step title="Verify the installation">
+    After installation, the server name appears with a checkmark in the Mason UI. You can also run `:Mason` and press `2` to list installed packages.
+  </Step>
+</Steps>
+
+## Step 2: Configure the server with lspconfig
+
+Installing a server with Mason does not automatically activate it. You need to call `lspconfig[server_name].setup()` in your starter config.
+
+Create (or edit) `~/.config/nvim/lua/configs/lspconfig.lua` and pull in NvChad's shared `on_attach`, `on_init`, and `capabilities` values:
+
+```lua lua/configs/lspconfig.lua
+local nvchad_lsp = require("nvchad.configs.lspconfig")
+
+-- List every server you want active
+local servers = { "pyright", "ts_ls", "html", "cssls" }
+
+for _, lsp in ipairs(servers) do
+  require("lspconfig")[lsp].setup({
+    on_attach    = nvchad_lsp.on_attach,
+    on_init      = nvchad_lsp.on_init,
+    capabilities = nvchad_lsp.capabilities,
+  })
+end
+```
+
+Then load this file from your plugin override for `nvim-lspconfig`. In `~/.config/nvim/lua/plugins/init.lua`:
+
+```lua lua/plugins/init.lua
+return {
+  {
+    "neovim/nvim-lspconfig",
+    config = function()
+      require("nvchad.configs.lspconfig").defaults()
+      require("configs.lspconfig")
+    end,
+  },
+}
+```
+
+<Note>
+`nvchad_lsp.on_attach` registers the standard LSP keymaps (`gd`, `gD`, `<leader>D`, `<leader>ra`, and workspace folder commands) on every buffer where a server attaches. `nvchad_lsp.capabilities` advertises enhanced completion capabilities to servers, including snippet support and documentation formatting.
+</Note>
+
+## Using the `vim.lsp.config()` API (Neovim 0.11+)
+
+NvChad targets Neovim 0.11 and uses the new `vim.lsp.config()` / `vim.lsp.enable()` API internally for `lua_ls`. You can use the same API for your own servers as an alternative to the lspconfig `setup()` call:
+
+```lua lua/configs/lspconfig.lua
+local nvchad_lsp = require("nvchad.configs.lspconfig")
+
+-- Apply shared capabilities and on_init to all servers (NvChad already does this)
+-- vim.lsp.config("*", { capabilities = nvchad_lsp.capabilities, on_init = nvchad_lsp.on_init })
+
+-- Configure a specific server
+vim.lsp.config("pyright", {
+  settings = {
+    python = {
+      analysis = {
+        typeCheckingMode = "strict",
+      },
+    },
+  },
+})
+
+vim.lsp.enable("pyright")
+```
+
+<Tip>
+`vim.lsp.config("*", {...})` applies options to every enabled server. NvChad already calls this for `capabilities` and `on_init`, so you only need to add server-specific settings.
+</Tip>
+
+## Language-specific examples
+
+<AccordionGroup>
+  <Accordion title="Python — pyright">
+    Install: `:MasonInstall pyright`
+
+    ```lua lua/configs/lspconfig.lua
+    require("lspconfig").pyright.setup({
+      on_attach    = nvchad_lsp.on_attach,
+      on_init      = nvchad_lsp.on_init,
+      capabilities = nvchad_lsp.capabilities,
+      settings = {
+        python = {
+          analysis = {
+            autoSearchPaths  = true,
+            useLibraryCodeForTypes = true,
+          },
+        },
+      },
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="TypeScript — ts_ls">
+    Install: `:MasonInstall typescript-language-server`
+
+    ```lua lua/configs/lspconfig.lua
+    require("lspconfig").ts_ls.setup({
+      on_attach    = nvchad_lsp.on_attach,
+      on_init      = nvchad_lsp.on_init,
+      capabilities = nvchad_lsp.capabilities,
+      init_options = {
+        preferences = {
+          importModuleSpecifierPreference = "relative",
+        },
+      },
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="Rust — rust_analyzer">
+    Install: `:MasonInstall rust-analyzer`
+
+    ```lua lua/configs/lspconfig.lua
+    require("lspconfig").rust_analyzer.setup({
+      on_attach    = nvchad_lsp.on_attach,
+      on_init      = nvchad_lsp.on_init,
+      capabilities = nvchad_lsp.capabilities,
+      settings = {
+        ["rust-analyzer"] = {
+          checkOnSave = { command = "clippy" },
+        },
+      },
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="Go — gopls">
+    Install: `:MasonInstall gopls`
+
+    ```lua lua/configs/lspconfig.lua
+    require("lspconfig").gopls.setup({
+      on_attach    = nvchad_lsp.on_attach,
+      on_init      = nvchad_lsp.on_init,
+      capabilities = nvchad_lsp.capabilities,
+      settings = {
+        gopls = {
+          gofumpt       = true,
+          staticcheck   = true,
+          usePlaceholders = true,
+        },
+      },
+    })
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Default LSP keymaps
+
+The following keymaps are registered by `nvchad_lsp.on_attach` on every buffer where a server attaches:
+
+| Keymap | Action |
+|--------|--------|
+| `gd` | Go to definition |
+| `gD` | Go to declaration |
+| `<leader>D` | Go to type definition |
+| `<leader>ra` | Rename symbol (NvRenamer UI) |
+| `<leader>wa` | Add workspace folder |
+| `<leader>wr` | Remove workspace folder |
+| `<leader>wl` | List workspace folders |
+
+Neovim 0.11 also provides `K` for hover docs and `<C-k>` for signature help out of the box.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title=":LspInfo — check which servers are attached">
+    Run `:LspInfo` in a buffer to see which servers are currently active, their root directories, and any configuration errors.
+  </Accordion>
+
+  <Accordion title=":LspLog — inspect server logs">
+    Run `:LspLog` to open the LSP log file. This shows the full JSON-RPC conversation between Neovim and the language server, useful for diagnosing startup failures.
+  </Accordion>
+
+  <Accordion title="Server installed but not starting">
+    Check that:
+
+    1. The server name passed to `lspconfig[name].setup()` matches the lspconfig server name (not the Mason package name). For example, Mason's `typescript-language-server` maps to lspconfig's `ts_ls`.
+    2. The file's filetype is in the server's supported list. Run `:set ft?` to check.
+    3. A `root_dir` was detected. Most servers require a project root (e.g., `package.json`, `pyproject.toml`). Open Neovim from inside your project directory.
+  </Accordion>
+
+  <Accordion title="Diagnostics not showing">
+    NvChad configures diagnostics in `nvchad.lsp.diagnostic_config()`. If you override the `nvim-lspconfig` plugin with a `config` function, make sure you still call `require("nvchad.configs.lspconfig").defaults()` to keep diagnostic settings intact.
+  </Accordion>
+</AccordionGroup>

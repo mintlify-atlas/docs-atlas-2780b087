@@ -1,0 +1,104 @@
+---
+title: "NvChad terminal: split and floating window management"
+description: "NvChad provides floating, horizontal, and vertical toggleable terminals via the nvchad.term module. Learn keymaps and the Lua API for terminal management."
+---
+
+NvChad ships a terminal management module at `nvchad.term` that lets you open terminals in split panels or floating windows, and toggle named terminal instances on and off without losing their state. All terminal windows are standard Neovim terminal buffers — you get full shell access with the speed of a native terminal.
+
+## The `nvchad.term` module
+
+The module exposes two functions:
+
+**`require("nvchad.term").new(opts)`** — opens a new terminal. The terminal is not toggleable; closing it discards the buffer.
+
+**`require("nvchad.term").toggle(opts)`** — opens or hides a named terminal. The terminal buffer persists in the background when hidden, so your shell session continues running. Call toggle again with the same `id` to bring it back.
+
+Both functions accept an `opts` table with the following keys:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `pos` | string | Window position: `"sp"` (horizontal split), `"vsp"` (vertical split), or `"float"` (floating window) |
+| `id` | string | A unique name for a toggleable terminal (only used with `.toggle()`) |
+
+## Keymaps
+
+### Opening new terminals
+
+These keymaps open a brand-new terminal each time they're pressed:
+
+| Keymap | Position | Description |
+|--------|----------|-------------|
+| `<leader>h` | `"sp"` | New terminal in a horizontal split |
+| `<leader>v` | `"vsp"` | New terminal in a vertical split |
+
+### Toggling named terminals
+
+These keymaps toggle a specific named terminal — the same buffer is shown and hidden each time. They work from both Normal mode and Terminal mode (`{ "n", "t" }`):
+
+| Keymap | Position | Terminal ID | Description |
+|--------|----------|-------------|-------------|
+| `<A-h>` | `"sp"` | `"htoggleTerm"` | Toggle horizontal split terminal |
+| `<A-v>` | `"vsp"` | `"vtoggleTerm"` | Toggle vertical split terminal |
+| `<A-i>` | `"float"` | `"floatTerm"` | Toggle floating terminal |
+
+### Exiting terminal mode
+
+| Keymap | Mode | Description |
+|--------|------|-------------|
+| `<C-x>` | Terminal | Return to Normal mode without closing the terminal |
+
+`<C-x>` sends `<C-\><C-N>`, which is Neovim's standard escape sequence from terminal mode.
+
+## Lua API examples
+
+The keymaps above map directly to these API calls:
+
+```lua
+-- Open a new horizontal split terminal
+require("nvchad.term").new { pos = "sp" }
+
+-- Open a new vertical split terminal
+require("nvchad.term").new { pos = "vsp" }
+
+-- Toggle the floating terminal (creates it on first call)
+require("nvchad.term").toggle { pos = "float", id = "floatTerm" }
+
+-- Toggle the horizontal split terminal
+require("nvchad.term").toggle { pos = "sp", id = "htoggleTerm" }
+
+-- Toggle the vertical split terminal
+require("nvchad.term").toggle { pos = "vsp", id = "vtoggleTerm" }
+```
+
+## Adding custom terminal keybindings
+
+You can define your own terminal keymaps using `nvchad.term` directly. For example, to open a dedicated terminal for running tests:
+
+```lua
+-- In ~/.config/nvim/lua/mappings.lua (your personal mappings)
+local map = vim.keymap.set
+
+-- Open a named floating terminal for running tests
+map({ "n", "t" }, "<A-t>", function()
+  require("nvchad.term").toggle { pos = "float", id = "testTerm" }
+end, { desc = "terminal toggle test runner" })
+
+-- Open a new vertical terminal each time
+map("n", "<leader>tv", function()
+  require("nvchad.term").new { pos = "vsp" }
+end, { desc = "terminal new vertical" })
+```
+
+<Tip>
+Use `toggle` with a unique `id` when you want a persistent shell — for example, a terminal dedicated to running a dev server. Use `new` when you want a fresh shell each time and don't need to return to the same session.
+</Tip>
+
+## Picking hidden terminals with Telescope
+
+When you hide a toggleable terminal, it stays in the background as a buffer. You can restore any hidden terminal using the Telescope `terms` extension:
+
+```
+<leader>pt
+```
+
+This opens a Telescope picker listing all hidden terminal buffers. Select one to bring it back to the foreground.

@@ -1,0 +1,144 @@
+---
+title: "NvChad architecture: core plugin and starter config"
+description: "NvChad separates core framework code from personal config using a starter repo and lazy.nvim's import feature, keeping updates clean and conflict-free."
+---
+
+NvChad is split across two repositories that work together: the core NvChad repo (this repo) ships the framework, and the [starter config](https://github.com/NvChad/starter) is what lives in your `~/.config/nvim`. The core repo is never edited directly — it is imported as a regular lazy.nvim plugin. This means updating NvChad is just updating a plugin, and your personal configuration never conflicts with upstream changes.
+
+## The two-repo model
+
+```
+~/.config/nvim/           ← your starter config (personal, gitignored customizations)
+  init.lua
+  lua/
+    chadrc.lua            ← user overrides via nvconfig
+    plugins/              ← your extra plugins
+    mappings.lua          ← your extra keymaps
+
+~/.local/share/nvim/lazy/NvChad/    ← core framework, managed by lazy.nvim
+  lua/nvchad/
+    options.lua
+    mappings.lua
+    autocmds.lua
+    plugins/init.lua
+    configs/
+```
+
+The starter config's `init.lua` bootstraps lazy.nvim and imports the NvChad core using lazy's `import` feature:
+
+```lua
+-- ~/.config/nvim/init.lua (starter config)
+require("lazy").setup({
+  { import = "nvchad.plugins" },  -- imports lua/nvchad/plugins/init.lua from the core repo
+  { import = "plugins" },         -- imports your own lua/plugins/ directory
+})
+```
+
+Because the NvChad core is a lazy.nvim import, every file inside `lua/nvchad/` is part of the plugin — not your config. You get updates by running `:Lazy update`.
+
+## The `nvchad/ui` entry point
+
+The core plugin list (`lua/nvchad/plugins/init.lua`) registers the NvChad UI plugin as a non-lazy plugin with `lazy = false`. Its `config` function is the single call that bootstraps the whole framework:
+
+```lua
+{
+  "nvchad/ui",
+  lazy = false,
+  config = function()
+    require "nvchad"   -- loads options, mappings, autocmds
+  end,
+},
+```
+
+`require("nvchad")` is the entry point for the framework. It applies core Neovim options, registers keymaps, and sets up autocmds — all from inside the plugin, not your personal config.
+
+## User overrides with `nvconfig`
+
+Your starter config exposes a `chadrc.lua` file that is read by NvChad as `nvconfig`. This is how you override the framework's defaults without touching any core file:
+
+```lua
+-- lua/chadrc.lua
+local M = {}
+
+M.ui = {
+  theme = "onedark",
+  tabufline = { enabled = true },
+}
+
+M.base46 = {
+  integrations = { "blankline", "cmp", "git" },
+}
+
+return M
+```
+
+NvChad reads this via `require("nvconfig")` at startup. For example, `mappings.lua` in the core checks `require("nvconfig").ui.tabufline.enabled` before registering tab navigation keymaps. None of your `chadrc.lua` contents are tracked in the NvChad repo.
+
+## Inside `lua/nvchad/`
+
+The core directory is deliberately small and focused:
+
+| File / Directory | Purpose |
+|---|---|
+| `options.lua` | Sets Neovim global options (`vim.opt`, `vim.o`, `vim.g`) |
+| `mappings.lua` | Registers all default keymaps using `vim.keymap.set` |
+| `autocmds.lua` | Defines core autocommands, including the `User FilePost` event |
+| `plugins/init.lua` | The full lazy.nvim plugin spec for every bundled plugin |
+| `configs/` | Per-plugin default config tables (`cmp.lua`, `telescope.lua`, `treesitter.lua`, etc.) |
+
+<Note>
+The `configs/` directory holds **default** plugin options. You override these in your starter config by passing new `opts` tables in your own plugin spec — lazy.nvim deep-merges them automatically.
+</Note>
+
+## The `User FilePost` autocmd pattern
+
+Several plugins in NvChad use `event = "User FilePost"` as their lazy-loading trigger instead of the standard `BufReadPost`. This custom event is fired by `autocmds.lua` after both `UIEnter` and an actual file buffer are present:
+
+```lua
+-- lua/nvchad/autocmds.lua
+autocmd({ "UIEnter", "BufReadPost", "BufNewFile" }, {
+  group = vim.api.nvim_create_augroup("NvFilePost", { clear = true }),
+  callback = function(args)
+    local file = vim.api.nvim_buf_get_name(args.buf)
+    local buftype = vim.api.nvim_get_option_value("buftype", { buf = args.buf })
+
+    if not vim.g.ui_entered and args.event == "UIEnter" then
+      vim.g.ui_entered = true
+    end
+
+    if file ~= "" and buftype ~= "nofile" and vim.g.ui_entered then
+      vim.api.nvim_exec_autocmds("User", { pattern = "FilePost", modeline = false })
+      vim.api.nvim_del_augroup_by_name "NvFilePost"
+      -- ...
+    end
+  end,
+})
+```
+
+The guard — `file ~= ""` and `buftype ~= "nofile"` and `vim.g.ui_entered` — ensures the event only fires once, when the UI is fully ready and a real file is open. This prevents plugins like `gitsigns`, `nvim-lspconfig`, and `indent-blankline` from loading on the NvChad dashboard.
+
+## Why this separation keeps updates clean
+
+<Steps>
+  <Step title="Core is just a plugin">
+    The NvChad core repo lives in `~/.local/share/nvim/lazy/NvChad/`. Updating it with `:Lazy update` replaces only those files. Your `~/.config/nvim/` is untouched.
+  </Step>
+  <Step title="Personal config is gitignored">
+    The starter config ships with a `.gitignore` that covers personal config files so your overrides never leak into git history.
+  </Step>
+  <Step title="Overrides via nvconfig, not forks">
+    Because all user customization flows through `chadrc.lua` (read as `nvconfig`), there is no need to fork or patch core files. Overrides are additive, not destructive.
+  </Step>
+  <Step title="Plugin configs are composable">
+    lazy.nvim deep-merges `opts` tables, so you extend a plugin's defaults by adding your own spec — the core config is never modified.
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="Lazy loading" icon="bolt" href="/concepts/lazy-loading">
+    See how NvChad lazy-loads 93% of plugins using events, commands, and filetypes.
+  </Card>
+  <Card title="Base46 theming" icon="swatchbook" href="/concepts/base46-theming">
+    Learn how Base46 compiles and caches highlight groups for all bundled plugins.
+  </Card>
+</CardGroup>

@@ -1,0 +1,89 @@
+{
+  "projectType": "framework",
+  "projectName": "NvChad",
+  "projectDescription": "A blazing fast Neovim framework written in Lua that provides a beautiful UI, sensible defaults, and a plugin ecosystem for building a fully-featured IDE-like experience.",
+  "theme": "maple",
+  "primaryColor": "#258f9c",
+  "lightColor": "#5aacb2",
+  "darkColor": "#cce5e6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart/install",
+              "quickstart/post-install"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/lazy-loading",
+              "concepts/base46-theming"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "config/options",
+              "config/mappings",
+              "config/plugins",
+              "config/lsp"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/ui-overview",
+              "features/telescope",
+              "features/nvimtree",
+              "features/terminal",
+              "features/themes"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/custom-plugins",
+              "guides/adding-lsp-servers",
+              "guides/contribute"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Blazing fast startup time (~0.02–0.07 seconds) via lazy loading",
+    "56+ beautiful color themes with a live theme switcher",
+    "Custom UI plugin (NvChad UI) with statusline, tabufline, and cheatsheet",
+    "Pre-configured LSP support via mason.nvim and nvim-lspconfig",
+    "Telescope integration for fuzzy file finding and live grep",
+    "Treesitter-based syntax highlighting",
+    "Autocompletion with nvim-cmp and LuaSnip",
+    "Git integration via gitsigns.nvim",
+    "File tree via nvim-tree.lua",
+    "Starter config pattern for easy personal customization"
+  ],
+  "publicApiSurface": [
+    "require('nvchad.configs.lspconfig').defaults()",
+    "require('nvchad.configs.lspconfig').on_attach",
+    "require('nvchad.configs.lspconfig').capabilities",
+    "require('nvchad.tabufline').next()",
+    "require('nvchad.tabufline').prev()",
+    "require('nvchad.tabufline').close_buffer()",
+    "require('nvchad.term').new { pos = 'sp' | 'vsp' | 'float' }",
+    "require('nvchad.term').toggle { pos, id }",
+    "require('nvchad.themes').open()",
+    "require('base46').load_all_highlights()",
+    "NvimTreeToggle / NvimTreeFocus",
+    "NvCheatsheet",
+    "TSInstallAll",
+    "Mason / MasonInstall / MasonUpdate"
+  ]
+}

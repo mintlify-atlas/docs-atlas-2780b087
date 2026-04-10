@@ -1,0 +1,173 @@
+---
+title: "NvChad default keymaps: complete keyboard reference"
+description: "NvChad ships with a comprehensive set of default keymaps for navigation, LSP, telescope, terminal, and file management. Learn them all here."
+---
+
+NvChad defines its default keymaps in `lua/nvchad/mappings.lua`. Every mapping has a `desc` field so they all appear in WhichKey and the built-in cheatsheet (`<leader>ch`). The tables below list every default keymap grouped by feature area.
+
+<Tip>
+Press `<leader>wK` at any time to open WhichKey and browse all active keymaps interactively, or `<leader>wk` to query a specific prefix.
+</Tip>
+
+## Insert mode movement
+
+These mappings let you move the cursor without leaving insert mode.
+
+| Key       | Action                    |
+| --------- | ------------------------- |
+| `<C-b>`   | Move to beginning of line |
+| `<C-e>`   | Move to end of line       |
+| `<C-h>`   | Move left one character   |
+| `<C-l>`   | Move right one character  |
+| `<C-j>`   | Move down one line        |
+| `<C-k>`   | Move up one line          |
+
+## Window navigation
+
+In normal mode, the same Ctrl+direction keys switch between open Neovim windows.
+
+| Key     | Action                  |
+| ------- | ----------------------- |
+| `<C-h>` | Switch to left window   |
+| `<C-l>` | Switch to right window  |
+| `<C-j>` | Switch to lower window  |
+| `<C-k>` | Switch to upper window  |
+
+## General
+
+| Key          | Mode         | Action                             |
+| ------------ | ------------ | ---------------------------------- |
+| `<Esc>`      | Normal       | Clear search highlights            |
+| `<C-s>`      | Normal       | Save file                          |
+| `<C-c>`      | Normal       | Copy entire file to clipboard      |
+| `<leader>n`  | Normal       | Toggle absolute line numbers       |
+| `<leader>rn` | Normal       | Toggle relative line numbers       |
+| `<leader>ch` | Normal       | Open NvChad cheatsheet             |
+| `<leader>fm` | Normal, Visual | Format file (conform, LSP fallback) |
+
+## Buffer / tabufline
+
+These mappings are only registered when `ui.tabufline.enabled` is `true` (the default).
+
+| Key          | Action                       |
+| ------------ | ---------------------------- |
+| `<Tab>`      | Go to next buffer            |
+| `<S-Tab>`    | Go to previous buffer        |
+| `<leader>x`  | Close current buffer         |
+| `<leader>b`  | Open a new empty buffer      |
+
+## LSP
+
+These mappings are registered globally. The buffer-local LSP mappings (attached per-file when a language server connects) are listed on the [LSP configuration](/config/lsp) page.
+
+| Key          | Action                              |
+| ------------ | ----------------------------------- |
+| `<leader>ds` | Send diagnostics to location list   |
+
+## Telescope
+
+| Key          | Action                                      |
+| ------------ | ------------------------------------------- |
+| `<leader>ff` | Find files in the current project           |
+| `<leader>fa` | Find all files (including hidden/ignored)   |
+| `<leader>fw` | Live grep across the project                |
+| `<leader>fb` | Browse open buffers                         |
+| `<leader>fh` | Search Neovim help tags                     |
+| `<leader>ma` | Browse marks                                |
+| `<leader>fo` | Browse recently opened files                |
+| `<leader>fz` | Fuzzy find in the current buffer            |
+| `<leader>cm` | Browse git commits                          |
+| `<leader>gt` | Browse git status                           |
+| `<leader>pt` | Pick a hidden terminal by name              |
+| `<leader>th` | Browse and apply NvChad themes              |
+
+## NvimTree
+
+| Key          | Action                        |
+| ------------ | ----------------------------- |
+| `<C-n>`      | Toggle the file tree          |
+| `<leader>e`  | Focus (jump to) the file tree |
+
+## Terminal
+
+NvChad wraps Neovim's built-in terminal with named, toggleable panes.
+
+| Key          | Mode           | Action                              |
+| ------------ | -------------- | ----------------------------------- |
+| `<C-x>`      | Terminal       | Exit terminal mode (back to normal) |
+| `<leader>h`  | Normal         | Open a new horizontal terminal      |
+| `<leader>v`  | Normal         | Open a new vertical terminal        |
+| `<A-v>`      | Normal, Terminal | Toggle vertical terminal          |
+| `<A-h>`      | Normal, Terminal | Toggle horizontal terminal        |
+| `<A-i>`      | Normal, Terminal | Toggle floating terminal          |
+
+<Note>
+`<leader>h` and `<leader>v` open a **new** terminal each time. `<A-h>`, `<A-v>`, and `<A-i>` **toggle** a single named terminal, so you can hide and re-open the same shell session.
+</Note>
+
+## Comment
+
+NvChad maps `<leader>/` over Neovim's built-in `gcc` / `gc` comment operators, which have been included natively since Neovim 0.10.
+
+| Key          | Mode   | Action                         |
+| ------------ | ------ | ------------------------------ |
+| `<leader>/`  | Normal | Toggle comment on current line |
+| `<leader>/`  | Visual | Toggle comment on selection    |
+
+## WhichKey
+
+| Key           | Action                              |
+| ------------- | ----------------------------------- |
+| `<leader>wK`  | Show all keymaps in WhichKey        |
+| `<leader>wk`  | Prompt for a prefix to look up      |
+
+## Adding custom keymaps
+
+Add your own mappings in `~/.config/nvim/lua/mappings.lua` inside the starter config. You have full access to `vim.keymap.set` and the same `map` shorthand convention:
+
+```lua
+local map = vim.keymap.set
+
+-- Example: open a terminal in a floating window with <A-t>
+map({ "n", "t" }, "<A-t>", function()
+  require("nvchad.term").toggle { pos = "float", id = "myTerm" }
+end, { desc = "terminal my float" })
+
+-- Example: quick save-and-quit
+map("n", "<leader>q", "<cmd>wqa<CR>", { desc = "save and quit all" })
+```
+
+<Steps>
+  <Step title="Open your mappings file">
+    ```bash
+    nvim ~/.config/nvim/lua/mappings.lua
+    ```
+  </Step>
+  <Step title="Add your mappings">
+    Write `vim.keymap.set` calls as you normally would. NvChad's defaults are already loaded, so you are only adding to them.
+  </Step>
+  <Step title="Add a desc for every mapping">
+    WhichKey and the cheatsheet (`<leader>ch`) rely on the `desc` field. Always include it:
+    ```lua
+    map("n", "<leader>q", "<cmd>qa<CR>", { desc = "quit all windows" })
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Do not edit `lua/nvchad/mappings.lua` inside the plugin directory. It is managed by lazy.nvim and will be overwritten on updates.
+</Warning>
+
+## Discovering keymaps
+
+<AccordionGroup>
+  <Accordion title="Open the NvChad cheatsheet">
+    Press `<leader>ch` to open the built-in cheatsheet, which shows all registered NvChad keymaps grouped by category in a floating window.
+  </Accordion>
+  <Accordion title="Browse all keymaps in WhichKey">
+    Press `<leader>wK` to open WhichKey in full-map mode. Every mapping with a `desc` field is shown. Press `<leader>wk` and enter a key prefix (for example `<leader>f`) to filter to a specific group.
+  </Accordion>
+  <Accordion title="Query Neovim directly">
+    Run `:map`, `:nmap`, `:imap`, or `:vmap` to list all mappings in a given mode. Combine with `/` to search for a specific key or description.
+  </Accordion>
+</AccordionGroup>

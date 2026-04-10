@@ -1,0 +1,172 @@
+---
+title: "How to contribute bug fixes and improvements to NvChad"
+description: "Learn how to contribute to NvChad by reporting issues, submitting pull requests, or improving the Lua codebase following the project's code style."
+---
+
+NvChad is an open-source project and welcomes contributions from the community. Whether you want to fix a bug, improve a default plugin config, or help others in the community, there are many ways to get involved. This page explains how the project is structured for contributors, what kinds of changes are accepted, and how to set up a local development environment.
+
+## Where to contribute
+
+The primary repository is at [https://github.com/NvChad/NvChad](https://github.com/NvChad/NvChad). This repo contains the NvChad core: plugin definitions, default configs, UI modules, LSP helpers, and theming infrastructure.
+
+<CardGroup cols={2}>
+  <Card title="Main repo" icon="github" href="https://github.com/NvChad/NvChad">
+    Core NvChad configuration, plugin specs, and UI components.
+  </Card>
+  <Card title="Starter config" icon="rocket" href="https://github.com/NvChad/starter">
+    The template users clone to get started. Contributions here affect the out-of-the-box experience.
+  </Card>
+  <Card title="base46" icon="palette" href="https://github.com/NvChad/base46">
+    The theming engine and all 56+ color themes live here.
+  </Card>
+  <Card title="NvChad UI" icon="layout-panel-top" href="https://github.com/NvChad/ui">
+    Statusline, tabufline, cheatsheet, and other UI components.
+  </Card>
+</CardGroup>
+
+## What kinds of contributions are welcome
+
+NvChad aims to remain a lightweight, opinionated base that works well for as many developers as possible. Not every change is a good fit for the core repo.
+
+**Welcome:**
+- Bug fixes, especially for crashes or incorrect behavior
+- Improvements to default plugin configurations that benefit most users
+- Performance improvements (lazy loading, startup time)
+- Compatibility fixes for new Neovim releases
+- Documentation improvements and typo fixes
+- New themes submitted to the base46 repo
+
+**Avoid:**
+- Large opinionated changes that only benefit a subset of users (add those to your starter config instead)
+- Breaking changes to existing keymaps or defaults without strong justification
+- Adding new plugins to the core set without discussion — open an issue first
+- Changes that significantly increase startup time
+
+<Note>
+If you are unsure whether a change is appropriate for the core repo, open a GitHub Issue to discuss it before writing code.
+</Note>
+
+## Code style
+
+NvChad is written in Lua and uses [stylua](https://github.com/JohnnyMorganz/StyLua) for formatting. All contributions must pass stylua formatting before they can be merged.
+
+### stylua configuration
+
+The `.stylua.toml` at the root of the repo defines the project's formatting rules:
+
+```toml .stylua.toml
+column_width = 120
+line_endings = "Unix"
+indent_type = "Spaces"
+indent_width = 2
+quote_style = "AutoPreferDouble"
+call_parentheses = "None"
+```
+
+Key points:
+- **2-space indentation** — no tabs
+- **120-character line width** — wider than many projects; use it
+- **Double quotes preferred** — stylua will fix single quotes automatically
+- **No parentheses on function calls with a single string or table argument** — `require "module"` not `require("module")`, `opts {}` not `opts({})`
+- **Unix line endings** — make sure your editor is not inserting CRLF
+
+### Format before committing
+
+Install stylua and run it on any files you changed:
+
+```bash
+# Install via cargo
+cargo install stylua
+
+# Or via Mason inside Neovim
+:MasonInstall stylua
+
+# Format a file
+stylua lua/nvchad/configs/lspconfig.lua
+
+# Format all Lua files in the repo
+stylua lua/
+```
+
+<Tip>
+Set up a pre-commit hook or configure your editor to run stylua on save so formatting issues are caught before you push.
+</Tip>
+
+## Setting up a development environment
+
+<Steps>
+  <Step title="Fork and clone the repo">
+    Fork [NvChad/NvChad](https://github.com/NvChad/NvChad) on GitHub, then clone your fork:
+
+    ```bash
+    git clone https://github.com/<your-username>/NvChad.git ~/projects/NvChad
+    ```
+  </Step>
+
+  <Step title="Point your starter config at your fork">
+    The starter config loads NvChad as a lazy.nvim plugin. To test your local changes, update the plugin spec in `~/.config/nvim/lua/plugins/init.lua` (or wherever lazy is bootstrapped) to use a local `dir` path instead of fetching from GitHub:
+
+    ```lua
+    -- In your lazy.nvim setup call, override the NvChad source:
+    {
+      "NvChad/NvChad",
+      dir = vim.fn.expand("~/projects/NvChad"),
+      import = "nvchad.plugins",
+    }
+    ```
+
+    Now Neovim loads NvChad directly from your local clone. Any edits you make are reflected immediately on the next `:Lazy reload` or Neovim restart.
+  </Step>
+
+  <Step title="Make your changes">
+    Edit files inside `~/projects/NvChad/lua/nvchad/`. Follow the code style rules above. Test your changes by opening Neovim and exercising the affected functionality.
+  </Step>
+
+  <Step title="Format and test">
+    Run stylua on your changed files, then verify Neovim starts cleanly and the feature works as expected.
+
+    ```bash
+    stylua lua/nvchad/configs/lspconfig.lua
+    ```
+  </Step>
+
+  <Step title="Open a pull request">
+    Push your branch to your fork and open a pull request against the `main` branch of [NvChad/NvChad](https://github.com/NvChad/NvChad). Describe what the change does and why it belongs in the core repo.
+  </Step>
+</Steps>
+
+## Reporting bugs
+
+Good bug reports save maintainers significant time. Before filing an issue, check whether the problem has already been reported in [GitHub Issues](https://github.com/NvChad/NvChad/issues).
+
+When opening a new issue, include:
+
+1. **Neovim version** — output of `nvim --version`
+2. **Operating system and version**
+3. **NvChad version** — the commit hash from `:Lazy` → NvChad entry
+4. **Minimal reproduction steps** — what you did, what you expected, what happened
+5. **Relevant error messages** — from `:messages`, `:LspLog`, or the Neovim log file
+
+<Warning>
+Issues without reproduction steps or version information are likely to be closed. The maintainers work on NvChad in their spare time and cannot investigate vague reports.
+</Warning>
+
+## Community channels
+
+The NvChad community is active across several platforms. These are the best places to ask questions, share configs, and discuss ideas before opening a formal issue or pull request.
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/gADmkJb9Fb">
+    The most active community channel. General help, showcase, and development discussion.
+  </Card>
+  <Card title="Matrix" icon="message-square" href="https://matrix.to/#/#nvchad:matrix.org">
+    Federated chat for those who prefer an open-source platform.
+  </Card>
+  <Card title="Telegram" icon="send" href="https://t.me/DE_WM">
+    Telegram group for NvChad users and contributors.
+  </Card>
+</CardGroup>
+
+## License
+
+NvChad is licensed under the **GNU General Public License v3.0 (GPL-3.0)**. By contributing, you agree that your contributions will be licensed under the same terms. You can read the full license text in the `LICENSE` file at the root of the repository.

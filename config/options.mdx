@@ -1,0 +1,227 @@
+---
+title: "Neovim options set by NvChad and how to override them"
+description: "NvChad sets sensible Neovim options by default. Learn which options are configured and how to override them in your personal starter config."
+---
+
+NvChad ships a carefully chosen set of Neovim options that make the editor feel modern and productive out of the box. These are loaded early in the startup sequence so every plugin and user config layer inherits a consistent baseline. You can override any of them in your own `options.lua` without touching the NvChad core.
+
+## Full source
+
+The complete options file is at `lua/nvchad/options.lua` inside the NvChad plugin:
+
+```lua
+local opt = vim.opt
+local o = vim.o
+local g = vim.g
+
+-------------------------------------- options ------------------------------------------
+o.laststatus = 3
+o.showmode = false
+o.splitkeep = "screen"
+
+o.clipboard = "unnamedplus"
+o.cursorline = true
+o.cursorlineopt = "number"
+
+-- Indenting
+o.expandtab = true
+o.shiftwidth = 2
+o.smartindent = true
+o.tabstop = 2
+o.softtabstop = 2
+
+opt.fillchars = { eob = " " }
+o.ignorecase = true
+o.smartcase = true
+o.mouse = "a"
+
+-- Numbers
+o.number = true
+o.numberwidth = 2
+o.ruler = false
+
+-- disable nvim intro
+opt.shortmess:append "sI"
+
+o.signcolumn = "yes"
+o.splitbelow = true
+o.splitright = true
+o.timeoutlen = 400
+o.undofile = true
+
+-- interval for writing swap file to disk, also used by gitsigns
+o.updatetime = 250
+
+-- go to previous/next line with h,l,left arrow and right arrow
+-- when cursor reaches end/beginning of line
+opt.whichwrap:append "<>[]hl"
+
+-- disable some default providers
+g.loaded_node_provider = 0
+g.loaded_python3_provider = 0
+g.loaded_perl_provider = 0
+g.loaded_ruby_provider = 0
+
+-- add binaries installed by mason.nvim to path
+local is_windows = vim.fn.has "win32" ~= 0
+local sep = is_windows and "\\" or "/"
+local delim = is_windows and ";" or ":"
+vim.env.PATH = table.concat({ vim.fn.stdpath "data", "mason", "bin" }, sep) .. delim .. vim.env.PATH
+```
+
+## Key settings explained
+
+### Clipboard
+
+```lua
+o.clipboard = "unnamedplus"
+```
+
+All yank, delete, and change operations go directly to the system clipboard. You can paste into any other application without a separate `"+y` step.
+
+### Indentation
+
+| Option        | Value | Effect                                              |
+| ------------- | ----- | --------------------------------------------------- |
+| `expandtab`   | true  | Inserts spaces instead of a literal tab character   |
+| `shiftwidth`  | 2     | Width of one indent level (`>>`, `<<`, autoindent)  |
+| `tabstop`     | 2     | How wide a `\t` character is displayed              |
+| `softtabstop` | 2     | How many spaces `<Tab>` inserts in insert mode      |
+| `smartindent` | true  | Adds an extra indent level after `{`, `(`, etc.     |
+
+Two-space indentation is the NvChad default. Override all five options together in your own `options.lua` if your project uses a different convention.
+
+### Cursor and line numbers
+
+```lua
+o.cursorline = true
+o.cursorlineopt = "number"  -- highlight only the line number, not the full line
+o.number = true
+o.numberwidth = 2
+o.ruler = false
+```
+
+`cursorlineopt = "number"` keeps the highlight subtle — only the line-number gutter is coloured, not the entire row.
+
+### Sign column
+
+```lua
+o.signcolumn = "yes"
+```
+
+The sign column is always visible, preventing the editor from jumping left/right as git signs and diagnostics appear and disappear.
+
+### Splits
+
+```lua
+o.splitbelow = true
+o.splitright = true
+```
+
+Horizontal splits open below the current window; vertical splits open to the right. This matches the conventional reading direction and avoids jarring layout shifts.
+
+### Undo and performance
+
+| Option       | Value | Effect                                                     |
+| ------------ | ----- | ---------------------------------------------------------- |
+| `undofile`   | true  | Persists undo history to disk across sessions              |
+| `updatetime` | 250   | Milliseconds until the swap file is written (also used by gitsigns for responsive diff markers) |
+| `timeoutlen` | 400   | Milliseconds to wait for a mapped key sequence to complete |
+
+### Search
+
+```lua
+o.ignorecase = true
+o.smartcase = true
+```
+
+Searches are case-insensitive unless you type an uppercase letter, at which point the search becomes case-sensitive automatically.
+
+### UI chrome
+
+```lua
+o.laststatus = 3   -- single global statusline for all windows
+o.showmode = false -- mode is shown by the NvChad statusline instead
+opt.shortmess:append "sI"  -- suppress "search hit BOTTOM" and intro messages
+opt.fillchars = { eob = " " }  -- hide the ~ markers on empty lines after EOF
+```
+
+### Line wrapping
+
+```lua
+opt.whichwrap:append "<>[]hl"
+```
+
+`h`, `l`, and the arrow keys wrap to the previous/next line when the cursor is at the beginning or end of a line.
+
+## Disabled providers
+
+```lua
+g.loaded_node_provider = 0
+g.loaded_python3_provider = 0
+g.loaded_perl_provider = 0
+g.loaded_ruby_provider = 0
+```
+
+NvChad disables the Node.js, Python 3, Perl, and Ruby providers at startup. These providers are used by older plugins that call external interpreters. Modern Neovim plugins written in Lua do not need them, and loading provider detection adds measurable startup latency.
+
+<Note>
+If you use a plugin that requires one of these providers (for example, a Python-based remote plugin), re-enable it in your own `options.lua`:
+
+```lua
+vim.g.loaded_python3_provider = nil
+```
+</Note>
+
+## Mason binary PATH injection
+
+```lua
+local is_windows = vim.fn.has "win32" ~= 0
+local sep = is_windows and "\\" or "/"
+local delim = is_windows and ";" or ":"
+vim.env.PATH = table.concat({ vim.fn.stdpath "data", "mason", "bin" }, sep) .. delim .. vim.env.PATH
+```
+
+Mason installs language servers, formatters, and linters into `~/.local/share/nvim/mason/bin/`. This snippet prepends that directory to `PATH` so that `nvim-lspconfig`, `conform.nvim`, and any shell commands you run from within Neovim can find Mason-managed binaries without any extra configuration.
+
+<Tip>
+Mason sets its own `PATH = "skip"` in its config (see `lua/nvchad/configs/mason.lua`) because NvChad handles the PATH injection here instead, avoiding a duplicate prepend.
+</Tip>
+
+## Overriding options in your starter config
+
+NvChad loads its options before your personal config. To change any option, create or edit `~/.config/nvim/lua/options.lua` and set the values you want:
+
+<Steps>
+  <Step title="Open your options file">
+    ```bash
+    nvim ~/.config/nvim/lua/options.lua
+    ```
+  </Step>
+  <Step title="Override specific options">
+    ```lua
+    local o = vim.o
+
+    -- Use 4-space indentation
+    o.shiftwidth = 4
+    o.tabstop = 4
+    o.softtabstop = 4
+
+    -- Keep undo history for 7 days
+    o.undolevels = 10000
+
+    -- Relative line numbers
+    o.relativenumber = true
+    ```
+  </Step>
+  <Step title="Ensure the file is required">
+    Your starter config's `init.lua` should already have `require "options"`. If it does not, add:
+    ```lua
+    require "options"
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Do not edit `lua/nvchad/options.lua` directly. It lives inside the `nvchad/NvChad` plugin directory managed by lazy.nvim and will be overwritten on updates.
+</Warning>

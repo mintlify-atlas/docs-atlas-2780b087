@@ -1,0 +1,215 @@
+---
+title: "How NvChad lazy-loads plugins for fast Neovim startup"
+description: "NvChad lazy-loads 93% of plugins by default using lazy.nvim events, commands, and filetypes — keeping startup time under 0.07 seconds."
+---
+
+NvChad uses [lazy.nvim](https://github.com/folke/lazy.nvim) as its plugin manager, and nearly every plugin in the default set is configured to load only when it is actually needed. The result is a startup time of around 0.02–0.07 seconds even on low-end hardware — measured on a 1.4 GHz Pentium with 4 GB of RAM and an HDD. Plugins load on demand via Neovim events, commands, and keypresses, so the editor is always responsive from the first keystroke.
+
+## What lazy loading means in lazy.nvim
+
+By default, every plugin entry in lazy.nvim is marked `lazy = true` unless you explicitly set `lazy = false`. A plugin set to lazy will not be `require()`-ed at startup. Instead, lazy.nvim registers lightweight event listeners, command stubs, or keymap handlers that trigger the real plugin load exactly once, the first time you need it.
+
+NvChad only sets `lazy = false` on the `nvchad/ui` plugin — everything else is deferred.
+
+## Lazy-loading strategies used in NvChad
+
+NvChad's plugin list (`lua/nvchad/plugins/init.lua`) uses four distinct lazy-loading triggers:
+
+### `event = "User FilePost"`
+
+The most common pattern. `User FilePost` is a custom Neovim user-event fired by NvChad's `autocmds.lua` once the UI is entered and a real file buffer is open. Plugins using this event load the moment you open your first actual file, but not on the dashboard or empty buffers.
+
+Plugins loaded this way: `indent-blankline`, `gitsigns`, `nvim-lspconfig`.
+
+```lua
+{
+  "lewis6991/gitsigns.nvim",
+  event = "User FilePost",
+  opts = function()
+    return require "nvchad.configs.gitsigns"
+  end,
+},
+
+{
+  "neovim/nvim-lspconfig",
+  event = "User FilePost",
+  config = function()
+    require("nvchad.configs.lspconfig").defaults()
+  end,
+},
+```
+
+### `event = "InsertEnter"`
+
+The completion stack — `nvim-cmp`, `LuaSnip`, `friendly-snippets`, `nvim-autopairs`, and all cmp source plugins — loads the first time you enter insert mode. None of these modules touch memory until you actually start typing.
+
+```lua
+{
+  "hrsh7th/nvim-cmp",
+  event = "InsertEnter",
+  dependencies = {
+    "L3MON4D3/LuaSnip",
+    "rafamadriz/friendly-snippets",
+    "windwp/nvim-autopairs",
+    "saadparwaiz1/cmp_luasnip",
+    "hrsh7th/cmp-nvim-lsp",
+    "hrsh7th/cmp-buffer",
+    -- ...
+  },
+  opts = function()
+    return require "nvchad.configs.cmp"
+  end,
+},
+```
+
+### `event = {"BufReadPost", "BufNewFile"}`
+
+Treesitter uses Neovim's built-in buffer events as its trigger, so syntax highlighting activates as soon as any buffer is read or created.
+
+```lua
+{
+  "nvim-treesitter/nvim-treesitter",
+  event = { "BufReadPost", "BufNewFile" },
+  cmd = { "TSInstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
+  build = ":TSUpdate | TSInstallAll",
+  opts = function()
+    return require "nvchad.configs.treesitter"
+  end,
+},
+```
+
+Treesitter also registers `cmd` entries so that `:TSInstall` and related commands work even before you've opened a file.
+
+### `cmd = {...}`
+
+Plugins that expose a primary command are loaded only when that command is first invoked. This is the pattern for `nvim-tree`, `mason`, and `which-key` — tools you reach for explicitly rather than implicitly.
+
+```lua
+{
+  "nvim-tree/nvim-tree.lua",
+  cmd = { "NvimTreeToggle", "NvimTreeFocus" },
+  opts = function()
+    return require "nvchad.configs.nvimtree"
+  end,
+},
+
+{
+  "mason-org/mason.nvim",
+  cmd = { "Mason", "MasonInstall", "MasonUpdate" },
+  opts = function()
+    return require "nvchad.configs.mason"
+  end,
+},
+```
+
+### `keys = {...}`
+
+`which-key` uses a `keys` spec so it loads the first time you press any of the listed prefixes. This covers `<leader>`, `<c-w>`, and common motion characters — so `which-key` is available whenever you pause on a partial keymap, but never at startup.
+
+```lua
+{
+  "folke/which-key.nvim",
+  keys = { "<leader>", "<c-w>", '"', "'", "`", "c", "v", "g" },
+  cmd = "WhichKey",
+  opts = function()
+    dofile(vim.g.base46_cache .. "whichkey")
+    return {}
+  end,
+},
+```
+
+Similarly, `telescope.nvim` uses `cmd = "Telescope"` — it only loads when you run a `:Telescope` command or trigger a keymap that calls one.
+
+```lua
+{
+  "nvim-telescope/telescope.nvim",
+  dependencies = { "nvim-treesitter/nvim-treesitter" },
+  cmd = "Telescope",
+  opts = function()
+    return require "nvchad.configs.telescope"
+  end,
+},
+```
+
+## How `User FilePost` is triggered
+
+The `User FilePost` event is not a standard Neovim event — NvChad fires it manually from `autocmds.lua`. The autocmd listens to `UIEnter`, `BufReadPost`, and `BufNewFile`, but only fires `User FilePost` once, when all three conditions hold: the UI has entered, the buffer has a real file path, and the buffer type is not `nofile`.
+
+```lua
+-- lua/nvchad/autocmds.lua
+autocmd({ "UIEnter", "BufReadPost", "BufNewFile" }, {
+  group = vim.api.nvim_create_augroup("NvFilePost", { clear = true }),
+  callback = function(args)
+    local file = vim.api.nvim_buf_get_name(args.buf)
+    local buftype = vim.api.nvim_get_option_value("buftype", { buf = args.buf })
+
+    if not vim.g.ui_entered and args.event == "UIEnter" then
+      vim.g.ui_entered = true
+    end
+
+    if file ~= "" and buftype ~= "nofile" and vim.g.ui_entered then
+      vim.api.nvim_exec_autocmds("User", { pattern = "FilePost", modeline = false })
+      vim.api.nvim_del_augroup_by_name "NvFilePost"
+    end
+  end,
+})
+```
+
+After firing once, the augroup is deleted so the event cannot be re-triggered. This is what prevents `gitsigns` and `nvim-lspconfig` from loading when you open NvChad on the dashboard — there is no real file buffer at that point.
+
+<Note>
+`User FilePost` fires after `UIEnter`, which means the NvChad UI (statusline, tabufline) is fully rendered before any of the file-dependent plugins load. This ordering avoids flash-of-unstyled-content in the UI.
+</Note>
+
+## Performance numbers
+
+From the NvChad README:
+
+> Lazy loading is done 93% of the time meaning that plugins will not be loaded by default, they will be loaded only when required also at specific commands, events etc. This lowers the startuptime and it was like 0.07~ secs tested on an old pentium machine 1.4ghz + 4gb ram & HDD.
+
+On modern hardware, startup times of 0.02 seconds are typical. The only plugin loaded unconditionally at startup is `nvchad/ui` (with `lazy = false`), plus `nvim-lua/plenary.nvim`, `nvchad/base46`, `nvzone/volt`, and `nvzone/menu` which have no lazy trigger and are loaded as dependencies.
+
+## Adding your own lazy-loaded plugins
+
+In your starter config's `lua/plugins/` directory, add plugin specs with the same lazy triggers:
+
+```lua
+-- lua/plugins/init.lua (your starter config)
+return {
+  -- Load only when the command is called
+  {
+    "folke/todo-comments.nvim",
+    cmd = { "TodoTelescope", "TodoQuickFix" },
+    config = true,
+  },
+
+  -- Load on a specific filetype
+  {
+    "lervag/vimtex",
+    ft = "tex",
+  },
+
+  -- Load on a keymap
+  {
+    "mbbill/undotree",
+    keys = { { "<leader>u", "<cmd>UndotreeToggle<CR>", desc = "Toggle undotree" } },
+  },
+}
+```
+
+<Tip>
+Use `ft = "..."` for language-specific plugins (LSP configs, formatters, linters). They will only load when you open a file of that type, keeping the plugin count for unrelated buffers at zero.
+</Tip>
+
+<Warning>
+Setting `lazy = false` on a plugin forces it to load at startup regardless of whether it is needed. Only do this for plugins that must be available before any event fires — for example, a colorscheme or a plugin that wraps Neovim's UI layer.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how the two-repo structure keeps your config separate from the NvChad core.
+  </Card>
+  <Card title="Base46 theming" icon="swatchbook" href="/concepts/base46-theming">
+    See how Base46 caches highlight groups so theme switching is near-instant.
+  </Card>
+</CardGroup>

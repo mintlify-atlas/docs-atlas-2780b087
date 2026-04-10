@@ -1,0 +1,122 @@
+---
+title: "Telescope in NvChad: all pickers, keymaps, and config"
+description: "NvChad integrates Telescope for fuzzy file finding, live grep, buffer switching, git inspection, and more. Learn all available pickers and keymaps."
+---
+
+Telescope is a highly extensible fuzzy finder built on top of Neovim's UI capabilities. NvChad includes it with a custom configuration that matches the active color theme, positions the prompt at the top of a floating window, and loads two custom extensions — `themes` for the NvChad theme picker and `terms` for picking hidden terminal buffers.
+
+## Configuration
+
+NvChad's Telescope config lives in `lua/nvchad/configs/telescope.lua`. It sets layout, prompt style, and the extensions that are loaded on startup:
+
+```lua
+dofile(vim.g.base46_cache .. "telescope")
+
+return {
+  defaults = {
+    prompt_prefix = "   ",
+    selection_caret = " ",
+    entry_prefix = " ",
+    sorting_strategy = "ascending",
+    layout_config = {
+      horizontal = {
+        prompt_position = "top",
+        preview_width = 0.55,
+      },
+      width = 0.87,
+      height = 0.80,
+    },
+    mappings = {
+      n = { ["q"] = require("telescope.actions").close },
+    },
+  },
+
+  extensions_list = { "themes", "terms" },
+  extensions = {},
+}
+```
+
+Key points:
+
+- **`sorting_strategy = "ascending"`** — results sort from top to bottom, matching the prompt-at-top layout
+- **`prompt_position = "top"`** — the input field appears at the top of the picker window
+- **`preview_width = 0.55`** — the preview pane takes 55% of the horizontal width
+- **`q` closes the picker** in Normal mode inside Telescope
+- **`extensions_list`** — NvChad auto-loads `themes` and `terms` extensions when Telescope initializes
+
+The `dofile(vim.g.base46_cache .. "telescope")` call at the top applies base46-generated highlight groups so the picker matches your active theme.
+
+## Keymaps
+
+All Telescope keymaps are registered in Normal mode under the `<leader>f` prefix for file/search operations, with additional mappings for git, marks, and NvChad-specific pickers.
+
+### File and search pickers
+
+| Keymap | Picker | Description |
+|--------|--------|-------------|
+| `<leader>ff` | `find_files` | Find files in the current project |
+| `<leader>fa` | `find_files` (all) | Find all files, including hidden and gitignored |
+| `<leader>fw` | `live_grep` | Live grep across the project |
+| `<leader>fb` | `buffers` | Switch between open buffers |
+| `<leader>fh` | `help_tags` | Search Neovim's built-in help |
+| `<leader>fo` | `oldfiles` | Browse recently opened files |
+| `<leader>fz` | `current_buffer_fuzzy_find` | Fuzzy search within the current buffer |
+
+<Note>
+`<leader>fa` passes `follow=true no_ignore=true hidden=true` to `find_files`, making it search dotfiles and files excluded by `.gitignore`. Use this when `<leader>ff` doesn't find what you're looking for.
+</Note>
+
+### Git pickers
+
+| Keymap | Picker | Description |
+|--------|--------|-------------|
+| `<leader>cm` | `git_commits` | Browse git commit history |
+| `<leader>gt` | `git_status` | Inspect files with unstaged/staged changes |
+
+### Other pickers
+
+| Keymap | Picker | Description |
+|--------|--------|-------------|
+| `<leader>ma` | `marks` | List and jump to Neovim marks |
+| `<leader>pt` | `terms` | Pick a hidden terminal buffer to restore |
+| `<leader>th` | NvChad themes | Open the live theme switcher |
+
+The `<leader>th` mapping calls `require("nvchad.themes").open()` directly rather than a standard Telescope picker — it uses the custom `themes` extension for a specialized layout.
+
+## Custom extensions
+
+NvChad registers two extensions in `extensions_list`:
+
+**`themes`** — powers `<leader>th`. Opens the NvChad theme picker, which previews each theme live as you move through the list. Switching themes recompiles base46 highlights on the fly.
+
+**`terms`** — powers `<leader>pt`. Lists all terminal buffers that have been hidden (toggled off), letting you bring one back to the foreground by selecting it.
+
+## Adding Telescope extensions
+
+To load additional Telescope extensions in your personal config, extend the `extensions_list` and `extensions` tables in your `chadrc.lua` or plugin overrides:
+
+```lua
+-- In your personal plugins file, override the telescope opts:
+{
+  "nvim-telescope/telescope.nvim",
+  opts = function()
+    local conf = require "nvchad.configs.telescope"
+
+    -- Add your extension to the load list
+    table.insert(conf.extensions_list, "fzf")
+
+    -- Provide extension-specific configuration
+    conf.extensions["fzf"] = {
+      fuzzy = true,
+      override_generic_sorter = true,
+      override_file_sorter = true,
+    }
+
+    return conf
+  end,
+},
+```
+
+<Tip>
+Always merge with the NvChad base config (`require "nvchad.configs.telescope"`) rather than replacing it entirely. This preserves the themed prompt and layout settings.
+</Tip>

@@ -1,0 +1,126 @@
+---
+title: "Install NvChad on Linux, macOS, and Windows systems"
+description: "Learn how to install NvChad on Linux, macOS, and Windows using the official starter config and Neovim's lazy.nvim plugin manager in minutes."
+---
+
+NvChad is not a standalone Neovim distribution — it's a framework you layer on top of Neovim using the [starter config](https://github.com/NvChad/starter). The starter config imports the NvChad core repository as a plugin via lazy.nvim, giving you the full UI, defaults, and module system while keeping your personal customizations separate and version-controlled.
+
+## Prerequisites
+
+Before installing, make sure you have the following tools available:
+
+- **Neovim 0.11 or later** — NvChad uses the new `vim.lsp.config` and `vim.lsp.enable` APIs introduced in 0.11.
+- **git** — required to clone the starter config and for lazy.nvim to fetch plugins.
+- **A Nerd Font** — NvChad's UI uses Nerd Font icons in the statusline, tabufline, file tree, and telescope results. Without one, you'll see broken box characters instead of icons.
+
+<Note>
+You can download and install a Nerd Font from [nerdfonts.com](https://www.nerdfonts.com). After installing, configure your terminal emulator to use the patched font.
+</Note>
+
+<Warning>
+If you have an existing Neovim config at `~/.config/nvim` (Linux/macOS) or `%LOCALAPPDATA%\nvim` (Windows), back it up before proceeding. The install steps will clone the starter config into that directory and will fail if it already exists.
+</Warning>
+
+## Install the starter config
+
+<Steps>
+  <Step title="Back up your existing config (if any)">
+    <Tabs>
+      <Tab title="Linux / macOS">
+        ```bash
+        mv ~/.config/nvim ~/.config/nvim.bak
+        mv ~/.local/share/nvim ~/.local/share/nvim.bak
+        mv ~/.local/state/nvim ~/.local/state/nvim.bak
+        mv ~/.cache/nvim ~/.cache/nvim.bak
+        ```
+      </Tab>
+      <Tab title="Windows">
+        ```powershell
+        Move-Item $env:LOCALAPPDATA\nvim $env:LOCALAPPDATA\nvim.bak
+        Move-Item $env:LOCALAPPDATA\nvim-data $env:LOCALAPPDATA\nvim-data.bak
+        ```
+      </Tab>
+    </Tabs>
+
+    Skip this step if you don't have an existing config.
+  </Step>
+
+  <Step title="Clone the starter config">
+    Clone the [NvChad starter](https://github.com/NvChad/starter) repository into your Neovim config directory.
+
+    <Tabs>
+      <Tab title="Linux / macOS">
+        ```bash
+        git clone https://github.com/NvChad/starter ~/.config/nvim
+        ```
+      </Tab>
+      <Tab title="Windows">
+        ```powershell
+        git clone https://github.com/NvChad/starter $env:LOCALAPPDATA\nvim
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Launch Neovim">
+    Start Neovim. On the first launch, lazy.nvim bootstraps itself and then automatically installs all plugins defined by NvChad and the starter config.
+
+    ```bash
+    nvim
+    ```
+
+    You'll see the lazy.nvim progress UI as plugins download and install. This takes a minute or two depending on your connection speed.
+
+    <Tip>
+    If you see a prompt asking whether to install plugins, press `Enter` to confirm. lazy.nvim handles everything — you don't need to run any separate install commands.
+    </Tip>
+  </Step>
+
+  <Step title="Wait for Treesitter parsers">
+    After plugins install, Treesitter builds its parsers. NvChad pre-installs parsers for `lua`, `luadoc`, `printf`, `vim`, and `vimdoc`. You'll see compilation messages in the status area — wait for them to finish before editing files.
+  </Step>
+
+  <Step title="Restart Neovim">
+    Once all plugins and parsers are installed, quit and reopen Neovim to ensure everything loads cleanly.
+
+    ```
+    :qa
+    ```
+
+    On the second launch you'll see the NvChad dashboard powered by nvdash.
+  </Step>
+</Steps>
+
+## What gets installed
+
+After a successful install, lazy.nvim has fetched and configured the following:
+
+| Plugin | Purpose |
+|---|---|
+| `nvchad/base46` | Theme engine and highlight caching |
+| `nvchad/ui` | Statusline, tabufline, cheatsheet, theme picker |
+| `nvim-tree/nvim-tree.lua` | File explorer |
+| `nvim-telescope/telescope.nvim` | Fuzzy finder |
+| `nvim-treesitter/nvim-treesitter` | Syntax highlighting |
+| `mason-org/mason.nvim` | LSP server installer |
+| `neovim/nvim-lspconfig` | LSP client configuration |
+| `hrsh7th/nvim-cmp` | Autocompletion engine |
+| `L3MON4D3/LuaSnip` | Snippet engine |
+| `lewis6991/gitsigns.nvim` | Git decorations and hunk actions |
+| `folke/which-key.nvim` | Keymap popup helper |
+| `stevearc/conform.nvim` | Code formatting |
+
+<Note>
+Plugins are lazy-loaded by default. Most plugins only load when triggered by a specific command, event, or keypress — this is how NvChad achieves startup times of 0.02–0.07 seconds.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Post-install setup" icon="sliders" href="/quickstart/post-install">
+    Install LSP servers, add Treesitter parsers, and explore keybindings.
+  </Card>
+  <Card title="Configuration guide" icon="gear" href="/config/options">
+    Customize options, keymaps, and plugins to match your workflow.
+  </Card>
+</CardGroup>

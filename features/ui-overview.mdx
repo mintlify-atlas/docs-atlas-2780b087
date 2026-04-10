@@ -1,0 +1,135 @@
+---
+title: "NvChad UI components: statusline, tabufline, cheatsheet"
+description: "NvChad ships a custom UI plugin with a modular statusline, a per-tab buffer manager called tabufline, and an interactive NvCheatsheet."
+---
+
+NvChad's UI is not a theme — it's a full set of custom interface components built in the `nvchad/ui` plugin. Loaded eagerly on every startup, it provides the statusline, the tabufline buffer manager, and the NvCheatsheet keymap reference. These components are styled automatically by base46, meaning they update whenever you switch themes.
+
+## The `nvchad/ui` plugin
+
+The `nvchad/ui` plugin is loaded unconditionally (`lazy = false`) so its components are available from the moment Neovim starts. It registers the statusline, tabufline, and cheatsheet, and reads your preferences from the `nvconfig` module in your personal config.
+
+```lua
+-- plugins/init.lua (NvChad core)
+{
+  "nvchad/ui",
+  lazy = false,
+  config = function()
+    require "nvchad"
+  end,
+}
+```
+
+## Statusline
+
+The statusline is written from scratch and is fully themeable. It reflects the current editor state at a glance, including:
+
+- **Mode indicator** — Normal, Insert, Visual, Command, and Terminal modes each render in a distinct color
+- **Git branch and diff stats** — powered by gitsigns.nvim integration
+- **LSP diagnostics** — error, warning, hint, and info counts from the active language server
+- **File name and modification state**
+- **Cursor position** — line and column
+
+Because the statusline reads highlight groups from the base46 cache, it automatically matches the active color theme without any manual configuration.
+
+## Tabufline
+
+Tabufline is NvChad's per-tab buffer manager, displayed in the `tabline` position at the top of the editor. Unlike a traditional bufferline that shows every open buffer globally, tabufline tracks which buffers were opened in each Vim tab — so switching tabs shows the buffers relevant to that tab's context.
+
+### Keymaps
+
+| Key | Action |
+|-----|--------|
+| `<Tab>` | Go to the next buffer |
+| `<S-Tab>` | Go to the previous buffer |
+| `<leader>x` | Close the current buffer |
+| `<leader>b` | Open a new empty buffer |
+
+### Lua API
+
+You can call tabufline functions directly in your own keymaps or autocmds:
+
+```lua
+require("nvchad.tabufline").next()          -- go to next buffer
+require("nvchad.tabufline").prev()          -- go to previous buffer
+require("nvchad.tabufline").close_buffer()  -- close current buffer
+```
+
+### Enabling or disabling tabufline
+
+Tabufline is controlled by the `nvconfig` module. In your `chadrc.lua`, set `ui.tabufline.enabled`:
+
+```lua
+-- ~/.config/nvim/lua/chadrc.lua
+---@type ChadrcConfig
+local M = {}
+
+M.ui = {
+  tabufline = {
+    enabled = true,  -- set to false to disable
+  },
+}
+
+return M
+```
+
+When `enabled` is `false`, the tabufline is hidden and the buffer navigation keymaps (`<Tab>`, `<S-Tab>`, `<leader>x`, `<leader>b`) are not registered.
+
+<Note>
+Tabufline keymaps are only registered when `require("nvconfig").ui.tabufline.enabled` is truthy. If you disable tabufline, you'll need to set up your own buffer navigation keymaps if you want them.
+</Note>
+
+## NvCheatsheet
+
+NvCheatsheet is an interactive full-screen keymap reference built into NvChad. It reads all registered keymaps and their descriptions, then renders them in a two-column layout organized by category. You can use it to discover keymaps you've forgotten or quickly check what a key does.
+
+To open the cheatsheet:
+
+- Press `<leader>ch` from Normal mode
+- Or run `:NvCheatsheet`
+
+To close it, press `q` or `<Esc>`.
+
+<Tip>
+Every keymap you define with a `desc` field will automatically appear in the cheatsheet. Use descriptive names when setting up your own mappings to keep the reference useful.
+</Tip>
+
+## nvzone plugins
+
+NvChad includes three plugins from the `nvzone` organization that extend the UI with additional utilities:
+
+<CardGroup cols={3}>
+  <Card title="nvzone/volt" icon="bolt">
+    A reactive UI framework used internally by NvChad to build reactive floating windows, including the theme picker.
+  </Card>
+  <Card title="nvzone/menu" icon="list">
+    A context menu system that provides mouse-friendly popup menus driven by Lua tables.
+  </Card>
+  <Card title="nvzone/minty" icon="palette">
+    A color utility with two commands: `Huefy` for interactive hue exploration and `Shades` for generating tint/shade variations. See [Themes](/features/themes) for details.
+  </Card>
+</CardGroup>
+
+## indent-blankline integration
+
+NvChad ships `lukas-reineke/indent-blankline.nvim` configured to use theme-aware highlight groups. The indent guide characters (`│`) are colored using `IblChar` and `IblScopeChar`, which are generated from the base46 cache:
+
+```lua
+-- From NvChad's plugin config
+{
+  "lukas-reineke/indent-blankline.nvim",
+  event = "User FilePost",
+  opts = {
+    indent = { char = "│", highlight = "IblChar" },
+    scope  = { char = "│", highlight = "IblScopeChar" },
+  },
+  config = function(_, opts)
+    dofile(vim.g.base46_cache .. "blankline")
+    local hooks = require "ibl.hooks"
+    hooks.register(hooks.type.WHITESPACE, hooks.builtin.hide_first_space_indent_level)
+    require("ibl").setup(opts)
+  end,
+}
+```
+
+The `dofile(vim.g.base46_cache .. "blankline")` call loads the pre-compiled highlight definitions for the current theme, so indent guides always match your active colorscheme.
